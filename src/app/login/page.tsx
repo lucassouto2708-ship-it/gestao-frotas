@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2, LogIn, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,39 +47,69 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4">
-      <form onSubmit={enviar} className="card w-full max-w-sm space-y-4">
-        <div className="flex flex-col items-center gap-2 pb-2">
-          <img src="/icon.svg" alt="" className="h-14 w-14" />
-          <h1 className="text-xl font-bold">Gestão de Frotas</h1>
-        </div>
-        {modo === "cadastrar" && (
-          <div>
-            <label className="rotulo" htmlFor="nome">Nome</label>
-            <input id="nome" className="campo" value={nome} onChange={(e) => setNome(e.target.value)} required />
+    <main className="flex min-h-dvh flex-col bg-fundo">
+      <div className="h-1 bg-primaria" />
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-[400px]">
+          <div className="mb-6 flex items-center gap-3">
+            <img src="/icon.svg" alt="" className="h-11 w-11 rounded" />
+            <div className="leading-tight">
+              <h1 className="text-[18px] font-bold">Gestão de Frotas</h1>
+              <p className="text-[13px] text-texto-2">Controle de quilometragem, manutenção e pneus</p>
+            </div>
           </div>
-        )}
-        <div>
-          <label className="rotulo" htmlFor="email">E-mail</label>
-          <input id="email" type="email" className="campo" value={email} onChange={(e) => setEmail(e.target.value)} required />
+
+          <form onSubmit={enviar} className="painel">
+            <div className="painel-cabecalho">
+              <h2 className="painel-titulo">{modo === "entrar" ? "Acesso ao sistema" : "Cadastro de usuário"}</h2>
+            </div>
+            <div className="painel-corpo space-y-3.5">
+              {modo === "cadastrar" && (
+                <div>
+                  <label className="rotulo" htmlFor="nome">Nome completo</label>
+                  <input id="nome" className="campo" value={nome} onChange={(e) => setNome(e.target.value)} required />
+                </div>
+              )}
+              <div>
+                <label className="rotulo" htmlFor="email">E-mail</label>
+                <input id="email" type="email" autoComplete="email" className="campo" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <div>
+                <label className="rotulo" htmlFor="senha">Senha</label>
+                <input
+                  id="senha"
+                  type="password"
+                  minLength={6}
+                  autoComplete={modo === "entrar" ? "current-password" : "new-password"}
+                  className="campo"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                />
+                {modo === "cadastrar" && <p className="ajuda">Mínimo de 6 caracteres.</p>}
+              </div>
+              {erro && <p className="erro">{erro}</p>}
+              {info && <p className="sucesso">{info}</p>}
+              <button className="botao w-full" disabled={carregando}>
+                {carregando ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : modo === "entrar" ? (
+                  <LogIn size={15} />
+                ) : (
+                  <UserPlus size={15} />
+                )}
+                {carregando ? "Aguarde…" : modo === "entrar" ? "Entrar" : "Criar conta"}
+              </button>
+            </div>
+            <div className="border-t border-borda px-4 py-3 text-center text-[13px]">
+              <button type="button" className="link" onClick={() => setModo(modo === "entrar" ? "cadastrar" : "entrar")}>
+                {modo === "entrar" ? "Não possui acesso? Cadastre-se" : "Já possuo cadastro"}
+              </button>
+            </div>
+          </form>
+          <p className="mt-4 text-center text-xs text-texto-2">Acesso restrito a usuários autorizados.</p>
         </div>
-        <div>
-          <label className="rotulo" htmlFor="senha">Senha</label>
-          <input id="senha" type="password" minLength={6} className="campo" value={senha} onChange={(e) => setSenha(e.target.value)} required />
-        </div>
-        {erro && <p className="erro">{erro}</p>}
-        {info && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{info}</p>}
-        <button className="botao w-full" disabled={carregando}>
-          {carregando ? "Aguarde…" : modo === "entrar" ? "Entrar" : "Criar conta"}
-        </button>
-        <button
-          type="button"
-          className="w-full text-sm text-marca hover:underline"
-          onClick={() => setModo(modo === "entrar" ? "cadastrar" : "entrar")}
-        >
-          {modo === "entrar" ? "Não tem conta? Cadastre-se" : "Já tenho conta"}
-        </button>
-      </form>
+      </div>
     </main>
   );
 }

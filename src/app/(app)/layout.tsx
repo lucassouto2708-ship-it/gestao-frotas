@@ -1,11 +1,11 @@
-import { Topo } from "@/components/Topo";
+import { Cabecalho } from "@/components/Cabecalho";
 import { getProfile } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getProfile();
   return (
     <>
-      <Topo profile={profile} />
+      <Cabecalho profile={profile} />
       {children}
     </>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { Pagina } from "@/components/Pagina";
@@ -47,27 +49,41 @@ export default function NovoVeiculo() {
   }
 
   return (
-    <Pagina titulo="Cadastrar carro" voltar="/">
-      <form onSubmit={salvar} className="card max-w-lg space-y-4">
-        <div>
-          <label className="rotulo" htmlFor="placa">Placa</label>
-          <input
-            id="placa"
-            className="campo uppercase"
-            placeholder="ABC1D23"
-            maxLength={8}
-            value={placa}
-            onChange={(e) => setPlaca(e.target.value)}
-            required
-          />
+    <Pagina titulo="Cadastrar veículo" descricao="Inclua um veículo na frota com a quilometragem atual do odômetro." voltar="/">
+      <form onSubmit={salvar} className="painel max-w-2xl">
+        <div className="painel-cabecalho">
+          <h2 className="painel-titulo">Dados do veículo</h2>
         </div>
-        <div>
-          <label className="rotulo" htmlFor="modelo">Modelo (opcional)</label>
-          <input id="modelo" className="campo" placeholder="Ex.: Fiat Strada 2023" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+        <div className="painel-corpo grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="rotulo" htmlFor="placa">Placa <span className="text-perigo">*</span></label>
+            <input
+              id="placa"
+              className="campo mono uppercase"
+              placeholder="ABC1D23"
+              maxLength={8}
+              value={placa}
+              onChange={(e) => setPlaca(e.target.value)}
+              required
+            />
+            <p className="ajuda">Padrão antigo (ABC1234) ou Mercosul (ABC1D23).</p>
+          </div>
+          <div>
+            <label className="rotulo" htmlFor="modelo">Modelo</label>
+            <input id="modelo" className="campo" placeholder="Ex.: Fiat Strada 2023" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <FotoNumero rotulo="Quilometragem atual do odômetro" modo="odometro" unidade="km" valor={kmTexto} onValor={setKmTexto} onFoto={setFoto} />
+          </div>
+          {erro && <p className="erro sm:col-span-2">{erro}</p>}
         </div>
-        <FotoNumero rotulo="Km atual do mostrador" modo="odometro" unidade="km" valor={kmTexto} onValor={setKmTexto} onFoto={setFoto} />
-        {erro && <p className="erro">{erro}</p>}
-        <button className="botao w-full" disabled={salvando}>{salvando ? "Salvando…" : "Cadastrar"}</button>
+        <div className="flex justify-end gap-2 border-t border-borda bg-superficie-2 px-4 py-3">
+          <Link href="/" className="botao-secundario">Cancelar</Link>
+          <button className="botao" disabled={salvando}>
+            {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {salvando ? "Salvando…" : "Cadastrar veículo"}
+          </button>
+        </div>
       </form>
     </Pagina>
   );

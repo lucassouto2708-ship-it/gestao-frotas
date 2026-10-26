@@ -13,7 +13,7 @@ export default async function FinalizarViagem({ params }: { params: Promise<{ id
   if (viagem.status !== "em_andamento") redirect("/");
 
   return (
-    <Pagina titulo="Finalizar viagem" voltar="/">
+    <Pagina titulo="Finalizar viagem" descricao="Registre a chegada com a foto do odômetro para calcular a distância percorrida." voltar="/">
       <FormFinalizar viagem={viagem} />
     </Pagina>
   );

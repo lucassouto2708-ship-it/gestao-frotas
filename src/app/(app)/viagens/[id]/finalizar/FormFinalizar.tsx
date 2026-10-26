@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Flag, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
@@ -43,28 +45,49 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Pick<Vehi
   }
 
   return (
-    <form onSubmit={salvar} className="card max-w-lg space-y-4">
-      <div className="rounded-lg bg-slate-100 p-3 text-sm">
-        <p className="font-bold">{formatarPlaca(viagem.vehicles.placa)} {viagem.vehicles.modelo}</p>
-        <p className="text-slate-600">Saída {dataHora(viagem.iniciada_em)} com {km(viagem.km_inicio)}</p>
+    <form onSubmit={salvar} className="painel max-w-2xl">
+      <div className="painel-cabecalho">
+        <h2 className="painel-titulo">Registro de chegada</h2>
       </div>
-      <FotoNumero
-        rotulo="Mostrador no fim da viagem"
-        modo="odometro"
-        unidade="km"
-        referencia={viagem.km_inicio}
-        valor={kmTexto}
-        onValor={setKmTexto}
-        onFoto={setFoto}
-        fotoObrigatoria
-      />
-      {rodado !== null && (
-        <p className="rounded-lg bg-emerald-50 p-3 text-center text-emerald-800">
-          Distância percorrida: <b>{km(rodado)}</b>
-        </p>
-      )}
-      {erro && <p className="erro">{erro}</p>}
-      <button className="botao w-full" disabled={salvando}>{salvando ? "Salvando…" : "Finalizar viagem"}</button>
+      <dl className="grid grid-cols-2 border-b border-borda bg-superficie-2 text-[13px] sm:grid-cols-4">
+        {[
+          ["Placa", <span key="p" className="mono font-semibold">{formatarPlaca(viagem.vehicles.placa)}</span>],
+          ["Veículo", viagem.vehicles.modelo || "—"],
+          ["Saída", dataHora(viagem.iniciada_em)],
+          ["Km na saída", <span key="k" className="tabular-nums">{km(viagem.km_inicio)}</span>],
+        ].map(([rotulo, valor], i) => (
+          <div key={i} className="border-borda px-4 py-2.5 sm:border-r last:border-r-0">
+            <dt className="text-[11px] font-semibold tracking-wider text-texto-2 uppercase">{rotulo}</dt>
+            <dd className="mt-0.5 font-medium">{valor}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="painel-corpo space-y-4">
+        <FotoNumero
+          rotulo="Odômetro na chegada"
+          modo="odometro"
+          unidade="km"
+          referencia={viagem.km_inicio}
+          valor={kmTexto}
+          onValor={setKmTexto}
+          onFoto={setFoto}
+          fotoObrigatoria
+        />
+        {rodado !== null && (
+          <div className="flex items-center justify-between rounded border border-borda border-l-[3px] border-l-primaria bg-primaria-suave px-4 py-2.5 text-[13px]">
+            <span className="font-medium">Distância percorrida</span>
+            <span className="text-[16px] font-semibold tabular-nums">{km(rodado)}</span>
+          </div>
+        )}
+        {erro && <p className="erro">{erro}</p>}
+      </div>
+      <div className="flex justify-end gap-2 border-t border-borda bg-superficie-2 px-4 py-3">
+        <Link href="/" className="botao-secundario">Cancelar</Link>
+        <button className="botao" disabled={salvando}>
+          {salvando ? <Loader2 size={15} className="animate-spin" /> : <Flag size={15} />}
+          {salvando ? "Salvando…" : "Finalizar viagem"}
+        </button>
+      </div>
     </form>
   );
 }

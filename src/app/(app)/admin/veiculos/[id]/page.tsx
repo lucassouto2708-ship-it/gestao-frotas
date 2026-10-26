@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { Pagina } from "@/components/Pagina";
+import { Camera, ClipboardList, Route, Wrench } from "lucide-react";
+import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
 import { PNEUS, dataHora, formatarPlaca, km, nivelPneu, statusOleo, statusRevisao } from "@/lib/regras";
@@ -32,133 +33,171 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
   const nome = (p: ComUsuario<unknown>["profiles"]) => p?.nome || p?.email || "—";
   const Foto = ({ caminho, rotulo }: { caminho: string | null; rotulo: string }) =>
     caminho && fotos[caminho] ? (
-      <a href={fotos[caminho]} target="_blank" className="text-marca underline">{rotulo}</a>
+      <a href={fotos[caminho]} target="_blank" title={`Abrir ${rotulo}`} className="ml-1.5 inline-flex items-center gap-1 align-middle text-xs text-primaria-texto hover:underline">
+        <Camera size={13} />
+        <span className="sr-only">{rotulo}</span>
+      </a>
     ) : null;
+  const textoNivel = (n: "ok" | "atencao" | "critico") => (n === "ok" ? "Em dia" : n === "atencao" ? "Em breve" : "Vencida");
 
   return (
-    <Pagina titulo={`${formatarPlaca(v.placa)} ${v.modelo ? `· ${v.modelo}` : ""}`} voltar="/admin">
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section className="card space-y-3 lg:col-span-2">
-          <h2 className="font-semibold">Situação</h2>
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-            <div><span className="text-slate-500">Km atual</span><p className="text-lg font-bold">{km(v.km_atual)}</p></div>
-            <div>
-              <span className="text-slate-500">Km no cadastro</span>
-              <p className="font-semibold">{km(v.km_inicial)} <Foto caminho={v.foto_km_inicial} rotulo="foto" /></p>
-            </div>
-            <div><span className="text-slate-500">Cadastrado em</span><p className="font-semibold">{dataHora(v.created_at)}</p></div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { titulo: "Troca de óleo", s: oleo },
-              { titulo: "Revisão", s: revisao },
-            ].map(({ titulo, s }) => (
-              <div key={titulo} className="rounded-lg bg-slate-50 p-3 text-sm">
-                <div className="mb-1 flex items-center justify-between">
-                  <b>{titulo}</b>
-                  <Selo nivel={s.nivel}>{s.nivel === "ok" ? "Em dia" : s.nivel === "atencao" ? "Em breve" : "Vencida"}</Selo>
+    <Pagina
+      titulo={`Veículo ${formatarPlaca(v.placa)}`}
+      descricao={`${v.modelo || "Modelo não informado"} · cadastrado em ${dataHora(v.created_at)}`}
+      voltar="/admin"
+    >
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="space-y-4">
+          <Painel titulo="Ficha do veículo" semPadding>
+            <dl className="grid grid-cols-2 text-[13px] sm:grid-cols-4">
+              {[
+                ["Placa", <span key="p" className="mono font-semibold">{formatarPlaca(v.placa)}</span>],
+                ["Modelo", v.modelo || "—"],
+                ["Km no cadastro", <span key="k" className="tabular-nums">{km(v.km_inicial)}<Foto caminho={v.foto_km_inicial} rotulo="foto do cadastro" /></span>],
+                ["Km atual", <span key="a" className="text-[15px] font-semibold tabular-nums">{km(v.km_atual)}</span>],
+              ].map(([rotulo, valor], i) => (
+                <div key={i} className="border-b border-borda px-4 py-3 sm:border-r sm:last:border-r-0">
+                  <dt className="text-[11px] font-semibold tracking-wider text-texto-2 uppercase">{rotulo}</dt>
+                  <dd className="mt-0.5 font-medium">{valor}</dd>
                 </div>
-                <p>A cada {km(s.intervalo)} · próxima com {km(s.proximaKm)}</p>
-                <p className="text-slate-600">{s.faltam > 0 ? `Faltam ${km(s.faltam)}` : `Passou ${km(-s.faltam)} do limite`}</p>
-                <div className="mt-2 h-2 overflow-hidden rounded bg-slate-200">
-                  <div
-                    className={`h-full ${s.nivel === "ok" ? "bg-emerald-500" : s.nivel === "atencao" ? "bg-amber-500" : "bg-red-500"}`}
-                    style={{ width: `${Math.min(100, Math.max(0, (s.rodado / s.intervalo) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="card space-y-3">
-          <h2 className="font-semibold">Registrar manutenção</h2>
-          <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
-        </section>
-      </div>
-
-      <section className="card mt-4">
-        <h2 className="mb-3 font-semibold">Pneus (últimas medições)</h2>
-        {listaMedicoes.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhuma medição ainda.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr><th className="py-2 pr-3">Data</th>{PNEUS.map((p) => <th key={p.campo} className="pr-3">{p.rotulo}</th>)}<th>Por</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {listaMedicoes.map((m) => (
-                  <tr key={m.id}>
-                    <td className="py-2 pr-3 whitespace-nowrap">{dataHora(m.created_at)}</td>
-                    {PNEUS.map((p) => {
-                      const mm = Number(m[p.campo]);
-                      return (
-                        <td key={p.campo} className="pr-3 whitespace-nowrap">
-                          <Selo nivel={nivelPneu(mm)}>{mm.toLocaleString("pt-BR")} mm</Selo>{" "}
-                          <Foto caminho={m[p.foto] as string | null} rotulo="foto" />
-                        </td>
-                      );
-                    })}
-                    <td className="whitespace-nowrap">{nome(m.profiles)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="card mt-4">
-        <h2 className="mb-3 font-semibold">Viagens</h2>
-        {listaViagens.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhuma viagem ainda.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr><th className="py-2 pr-3">Saída</th><th className="pr-3">Motorista</th><th className="pr-3">Destino</th><th className="pr-3">Km início</th><th className="pr-3">Km fim</th><th>Rodado</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {listaViagens.map((t) => (
-                  <tr key={t.id}>
-                    <td className="py-2 pr-3 whitespace-nowrap">{dataHora(t.iniciada_em)}</td>
-                    <td className="pr-3">{nome(t.profiles)}</td>
-                    <td className="pr-3">{t.destino || "—"}</td>
-                    <td className="pr-3 whitespace-nowrap">{km(t.km_inicio)} <Foto caminho={t.foto_inicio} rotulo="foto" /></td>
-                    <td className="pr-3 whitespace-nowrap">
-                      {t.km_fim !== null ? <>{km(t.km_fim)} <Foto caminho={t.foto_fim} rotulo="foto" /></> : <Selo nivel="atencao">Em andamento</Selo>}
-                    </td>
-                    <td className="font-semibold whitespace-nowrap">{t.km_fim !== null ? km(t.km_fim - t.km_inicio) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <section className="card">
-          <h2 className="mb-3 font-semibold">Histórico de manutenção</h2>
-          {(manutencoes ?? []).length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhuma manutenção registrada.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {((manutencoes ?? []) as Maintenance[]).map((m) => (
-                <li key={m.id} className="py-2">
-                  <b>{m.tipo === "oleo" ? "Troca de óleo" : "Revisão"}</b> com {km(m.km)} ·{" "}
-                  {new Date(`${m.realizada_em}T12:00:00`).toLocaleDateString("pt-BR")}
-                  {m.observacao && <p className="text-slate-500">{m.observacao}</p>}
-                </li>
               ))}
-            </ul>
-          )}
-        </section>
-        <section className="card">
-          <h2 className="mb-3 font-semibold">Configurações do carro</h2>
-          <FormConfigVeiculo veiculo={v} />
-        </section>
+            </dl>
+            <div className="grid sm:grid-cols-2">
+              {[
+                { titulo: "Troca de óleo", s: oleo },
+                { titulo: "Revisão", s: revisao },
+              ].map(({ titulo, s }) => (
+                <div key={titulo} className="border-borda px-4 py-3 text-[13px] sm:border-r sm:last:border-r-0">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="font-semibold">{titulo}</span>
+                    <Selo nivel={s.nivel}>{textoNivel(s.nivel)}</Selo>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-sm bg-superficie-2 ring-1 ring-borda">
+                    <div
+                      className={`h-full ${s.nivel === "ok" ? "bg-sucesso" : s.nivel === "atencao" ? "bg-alerta" : "bg-perigo"}`}
+                      style={{ width: `${Math.min(100, Math.max(0, (s.rodado / s.intervalo) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-xs text-texto-2 tabular-nums">
+                    <span>Intervalo {km(s.intervalo)} · próxima em {km(s.proximaKm)}</span>
+                    <span className={s.nivel === "critico" ? "font-semibold text-perigo" : ""}>
+                      {s.faltam > 0 ? `faltam ${km(s.faltam)}` : `excedido ${km(-s.faltam)}`}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Painel>
+
+          <Painel titulo="Medições de pneus" acoes={<span className="text-xs text-texto-2">Últimas 10</span>} semPadding>
+            {listaMedicoes.length === 0 ? (
+              <EstadoVazio icone={<ClipboardList size={26} strokeWidth={1.5} />} titulo="Nenhuma medição registrada" texto="As aferições do sulco feitas pelos operadores aparecerão aqui." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="tabela">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      {PNEUS.map((p) => <th key={p.campo} className="num">{p.rotulo}</th>)}
+                      <th>Responsável</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listaMedicoes.map((m) => (
+                      <tr key={m.id}>
+                        <td className="whitespace-nowrap">{dataHora(m.created_at)}</td>
+                        {PNEUS.map((p) => {
+                          const mm = Number(m[p.campo]);
+                          const nivel = nivelPneu(mm);
+                          return (
+                            <td key={p.campo} className={`num ${nivel === "critico" ? "font-semibold text-perigo" : nivel === "atencao" ? "text-alerta" : ""}`}>
+                              {mm.toLocaleString("pt-BR", { minimumFractionDigits: 1 })} mm
+                              <Foto caminho={m[p.foto] as string | null} rotulo={`foto ${p.rotulo.toLowerCase()}`} />
+                            </td>
+                          );
+                        })}
+                        <td className="whitespace-nowrap">{nome(m.profiles)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Painel>
+
+          <Painel titulo="Viagens" acoes={<span className="text-xs text-texto-2">Últimas 50</span>} semPadding>
+            {listaViagens.length === 0 ? (
+              <EstadoVazio icone={<Route size={26} strokeWidth={1.5} />} titulo="Nenhuma viagem registrada" />
+            ) : (
+              <div className="max-h-[60vh] overflow-auto">
+                <table className="tabela">
+                  <thead>
+                    <tr>
+                      <th>Saída</th>
+                      <th>Motorista</th>
+                      <th>Destino</th>
+                      <th className="num">Km inicial</th>
+                      <th className="num">Km final</th>
+                      <th className="num">Percorrido</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listaViagens.map((t) => (
+                      <tr key={t.id}>
+                        <td className="whitespace-nowrap">{dataHora(t.iniciada_em)}</td>
+                        <td className="whitespace-nowrap">{nome(t.profiles)}</td>
+                        <td>{t.destino || <span className="text-texto-2">—</span>}</td>
+                        <td className="num">{km(t.km_inicio)}<Foto caminho={t.foto_inicio} rotulo="foto da saída" /></td>
+                        <td className="num">
+                          {t.km_fim !== null ? <>{km(t.km_fim)}<Foto caminho={t.foto_fim} rotulo="foto da chegada" /></> : <Selo nivel="info">Em andamento</Selo>}
+                        </td>
+                        <td className="num font-semibold">{t.km_fim !== null ? km(t.km_fim - t.km_inicio) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Painel>
+        </div>
+
+        <div className="space-y-4 self-start">
+          <Painel titulo="Registrar manutenção">
+            <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
+          </Painel>
+
+          <Painel titulo="Histórico de manutenção" semPadding>
+            {(manutencoes ?? []).length === 0 ? (
+              <EstadoVazio icone={<Wrench size={24} strokeWidth={1.5} />} titulo="Nenhuma manutenção registrada" />
+            ) : (
+              <table className="tabela">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Serviço</th>
+                    <th className="num">Km</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {((manutencoes ?? []) as Maintenance[]).map((m) => (
+                    <tr key={m.id}>
+                      <td className="whitespace-nowrap">{new Date(`${m.realizada_em}T12:00:00`).toLocaleDateString("pt-BR")}</td>
+                      <td>
+                        {m.tipo === "oleo" ? "Troca de óleo" : "Revisão"}
+                        {m.observacao && <p className="text-xs text-texto-2">{m.observacao}</p>}
+                      </td>
+                      <td className="num">{km(m.km)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Painel>
+
+          <Painel titulo="Configurações do veículo">
+            <FormConfigVeiculo veiculo={v} />
+          </Painel>
+        </div>
       </div>
     </Pagina>
   );

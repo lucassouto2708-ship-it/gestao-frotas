@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { Camera, CheckCircle2, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { comprimirImagem } from "@/lib/imagem";
 import { lerNumero, type ModoLeitura } from "@/lib/ocr";
 
@@ -21,13 +22,24 @@ export function FotoNumero({ rotulo, modo, referencia, valor, onValor, onFoto, f
   const id = useId();
   const [preview, setPreview] = useState<string | null>(null);
   const [lendo, setLendo] = useState(false);
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [arrastando, setArrastando] = useState(false);
 
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
-  async function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
+  function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
-    if (!arquivo) return;
+    if (arquivo) void processar(arquivo);
+  }
+
+  function aoSoltar(e: React.DragEvent) {
+    e.preventDefault();
+    setArrastando(false);
+    const arquivo = e.dataTransfer.files?.[0];
+    if (arquivo?.type.startsWith("image/")) void processar(arquivo);
+  }
+
+  async function processar(arquivo: File) {
     setAviso(null);
     const foto = await comprimirImagem(arquivo);
     setPreview(URL.createObjectURL(foto));
@@ -37,50 +49,81 @@ export function FotoNumero({ rotulo, modo, referencia, valor, onValor, onFoto, f
     try {
       const n = await lerNumero(foto, modo, referencia);
       if (n === null) {
-        setAviso("Não consegui ler o número na foto. Digite o valor.");
+        setAviso({ ok: false, texto: "Não foi possível ler o número na foto. Informe o valor manualmente." });
       } else {
         onValor(modo === "pneu" ? n.toFixed(1) : String(n));
-        setAviso("Valor lido da foto. Confira antes de salvar.");
+        setAviso({ ok: true, texto: "Valor lido da foto. Confira antes de salvar." });
       }
     } catch {
-      setAviso("A leitura automática falhou. Digite o valor.");
+      setAviso({ ok: false, texto: "A leitura automática falhou. Informe o valor manualmente." });
     } finally {
       setLendo(false);
     }
   }
 
   return (
-    <div className="space-y-2">
-      <span className="rotulo">{rotulo}</span>
+    <div>
+      <span className="rotulo">
+        {rotulo}
+        {fotoObrigatoria && <span className="text-perigo"> *</span>}
+      </span>
       <label
         htmlFor={id}
-        className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-3 hover:border-marca"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setArrastando(true);
+        }}
+        onDragLeave={() => setArrastando(false)}
+        onDrop={aoSoltar}
+        className={`flex cursor-pointer items-center gap-3 rounded border border-dashed p-2.5 transition-colors ${
+          arrastando ? "border-primaria bg-primaria-suave" : "border-borda-forte bg-superficie-2 hover:border-primaria"
+        }`}
       >
         {preview ? (
-          <img src={preview} alt="Foto do mostrador" className="h-20 w-28 rounded object-cover" />
+          <img src={preview} alt="Foto do mostrador" className="h-16 w-24 shrink-0 rounded-[3px] border border-borda object-cover" />
         ) : (
-          <span className="flex h-20 w-28 items-center justify-center rounded bg-slate-200 text-3xl">📷</span>
+          <span className="flex h-16 w-24 shrink-0 items-center justify-center rounded-[3px] border border-borda bg-superficie text-texto-2">
+            <Camera size={22} strokeWidth={1.5} />
+          </span>
         )}
-        <span className="text-sm text-slate-600">
-          {preview ? "Trocar foto" : "Tirar foto do mostrador"}
-          {fotoObrigatoria && !preview && <span className="text-red-600"> *</span>}
+        <span className="min-w-0 text-[13px] leading-snug">
+          {preview ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-primaria-texto">
+              <RefreshCw size={13} /> Substituir foto
+            </span>
+          ) : (
+            <>
+              <span className="block font-medium">Fotografar o mostrador</span>
+              <span className="block text-texto-2">ou arraste a imagem aqui · JPG, PNG</span>
+            </>
+          )}
         </span>
       </label>
       <input id={id} type="file" accept="image/*" capture="environment" className="hidden" onChange={aoEscolher} />
 
-      <div className="flex items-center gap-2">
+      <div className="mt-2 flex items-center">
         <input
-          className="campo"
+          className="campo rounded-r-none text-right font-semibold tabular-nums"
           inputMode={modo === "pneu" ? "decimal" : "numeric"}
-          placeholder={modo === "pneu" ? "Ex.: 4,5" : "Ex.: 45230"}
+          placeholder={modo === "pneu" ? "0,0" : "0"}
           value={valor}
           onChange={(e) => onValor(e.target.value)}
           required
         />
-        <span className="text-sm text-slate-500">{unidade}</span>
+        <span className="flex h-9 items-center rounded-r border border-l-0 border-borda-forte bg-superficie-2 px-2.5 text-[12px] text-texto-2">
+          {unidade}
+        </span>
       </div>
-      {lendo && <p className="text-xs text-marca">Lendo números da foto…</p>}
-      {!lendo && aviso && <p className="text-xs text-slate-500">{aviso}</p>}
+      {lendo && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-primaria-texto">
+          <Loader2 size={12} className="animate-spin" /> Lendo números da foto…
+        </p>
+      )}
+      {!lendo && aviso && (
+        <p className={`mt-1 flex items-center gap-1.5 text-xs ${aviso.ok ? "text-sucesso" : "text-alerta"}`}>
+          {aviso.ok ? <CheckCircle2 size={12} /> : <TriangleAlert size={12} />} {aviso.texto}
+        </p>
+      )}
     </div>
   );
 }

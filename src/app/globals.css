@@ -1,31 +1,172 @@
 @import "tailwindcss";
 
-@theme {
-  --color-marca: #1d4ed8;
-  --color-marca-escura: #1e3a8a;
+/* =====================================================================
+   Identidade visual — tokens
+   Tema claro é o principal; o escuro usa grafite/azul profundo.
+   ===================================================================== */
+:root {
+  --fundo: #f5f6f8;
+  --superficie: #ffffff;
+  --superficie-2: #f9fafb;
+  --texto: #1f2937;
+  --texto-2: #6b7280;
+  --borda: #e2e5e9;
+  --borda-forte: #cfd4da;
+  --primaria: #1e4e8c;
+  --primaria-hover: #183f72;
+  --primaria-texto: #1e4e8c;
+  --primaria-suave: #eaf2ff;
+  --sucesso: #16835b;
+  --sucesso-suave: #e7f4ee;
+  --alerta: #b7791f;
+  --alerta-suave: #fbf3e4;
+  --perigo: #c0392b;
+  --perigo-suave: #fbecea;
+  --cabecalho: #1e4e8c;
+  --cabecalho-texto: #ffffff;
+  --zebra: #fafbfc;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --fundo: #161b22;
+  --superficie: #1e252e;
+  --superficie-2: #232b35;
+  --texto: #e3e7ec;
+  --texto-2: #9aa4b1;
+  --borda: #2e3743;
+  --borda-forte: #3b4655;
+  --primaria: #2f63a8;
+  --primaria-hover: #3a71ba;
+  --primaria-texto: #7fa9e0;
+  --primaria-suave: #1d2d44;
+  --sucesso: #3fae84;
+  --sucesso-suave: #17302a;
+  --alerta: #d6a14a;
+  --alerta-suave: #33291a;
+  --perigo: #e0675a;
+  --perigo-suave: #3a2222;
+  --cabecalho: #1a2433;
+  --cabecalho-texto: #e3e7ec;
+  --zebra: #212831;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-texto: var(--texto);
+  --color-texto-2: var(--texto-2);
+  --color-borda: var(--borda);
+  --color-borda-forte: var(--borda-forte);
+  --color-primaria: var(--primaria);
+  --color-primaria-hover: var(--primaria-hover);
+  --color-primaria-texto: var(--primaria-texto);
+  --color-primaria-suave: var(--primaria-suave);
+  --color-sucesso: var(--sucesso);
+  --color-sucesso-suave: var(--sucesso-suave);
+  --color-alerta: var(--alerta);
+  --color-alerta-suave: var(--alerta-suave);
+  --color-perigo: var(--perigo);
+  --color-perigo-suave: var(--perigo-suave);
+  --color-cabecalho: var(--cabecalho);
+  --color-cabecalho-texto: var(--cabecalho-texto);
+  --color-zebra: var(--zebra);
+}
+
+html {
+  font-size: 14px;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* =====================================================================
+   Componentes
+   ===================================================================== */
 @layer components {
-  .card {
-    @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm;
+  /* Painel: bloco de trabalho com cabeçalho próprio */
+  .painel {
+    @apply rounded border border-borda bg-superficie;
   }
+  .painel-cabecalho {
+    @apply flex min-h-11 items-center justify-between gap-3 border-b border-borda px-4 py-2.5;
+  }
+  .painel-titulo {
+    @apply text-[13px] font-semibold tracking-wide text-texto uppercase;
+  }
+  .painel-corpo {
+    @apply p-4;
+  }
+
+  /* Formulários */
   .rotulo {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1 block text-[13px] font-medium text-texto;
+  }
+  .ajuda {
+    @apply mt-1 text-xs text-texto-2;
   }
   .campo {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-marca focus:ring-2 focus:ring-marca/20;
+    @apply h-9 w-full rounded border border-borda-forte bg-superficie px-2.5 text-[14px] text-texto outline-none placeholder:text-texto-2/70 focus:border-primaria focus:ring-2 focus:ring-primaria/15 disabled:bg-superficie-2;
   }
+
+  /* Botões: primário, secundário, perigo */
   .botao {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-marca px-4 py-3 font-semibold text-white transition hover:bg-marca-escura disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded border border-primaria bg-primaria px-4 text-[13px] font-semibold text-white transition-colors hover:bg-primaria-hover disabled:cursor-not-allowed disabled:opacity-50;
   }
   .botao-secundario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded border border-borda-forte bg-superficie px-4 text-[13px] font-semibold text-texto transition-colors hover:bg-superficie-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
+  .botao-perigo {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded border border-perigo bg-superficie px-4 text-[13px] font-semibold text-perigo transition-colors hover:bg-perigo-suave disabled:opacity-50;
+  }
+  .botao-pequeno {
+    @apply h-7 px-2.5 text-xs;
+  }
+
+  /* Mensagens */
   .erro {
-    @apply rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700;
+    @apply rounded border border-perigo/30 border-l-[3px] border-l-perigo bg-perigo-suave px-3 py-2 text-[13px] text-perigo;
+  }
+  .sucesso {
+    @apply rounded border border-sucesso/30 border-l-[3px] border-l-sucesso bg-sucesso-suave px-3 py-2 text-[13px] text-sucesso;
+  }
+
+  /* Tabela de auditoria */
+  .tabela {
+    @apply w-full border-collapse text-[13px];
+  }
+  .tabela thead th {
+    @apply sticky top-0 z-[1] border-b border-borda-forte bg-superficie-2 px-3 py-2 text-left text-[11px] font-semibold tracking-wider whitespace-nowrap text-texto-2 uppercase;
+  }
+  .tabela tbody td {
+    @apply border-b border-borda px-3 py-2 align-middle;
+  }
+  .tabela tbody tr:nth-child(even) td {
+    @apply bg-zebra;
+  }
+  .tabela tbody tr:hover td {
+    @apply bg-primaria-suave/60;
+  }
+  .tabela .num {
+    @apply text-right whitespace-nowrap tabular-nums;
+  }
+  .tabela thead th.num {
+    @apply text-right;
+  }
+
+  .mono {
+    @apply font-mono text-[12.5px] tracking-tight;
+  }
+  .link {
+    @apply font-medium text-primaria-texto hover:underline;
   }
 }

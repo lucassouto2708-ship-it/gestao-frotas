@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Gauge, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
@@ -50,35 +52,48 @@ export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso
   }
 
   return (
-    <form onSubmit={salvar} className="card max-w-lg space-y-4">
-      <div>
-        <label className="rotulo" htmlFor="veiculo">Carro</label>
-        <select id="veiculo" className="campo" value={veiculoId} onChange={(e) => setVeiculoId(e.target.value)} required>
-          <option value="">Selecione…</option>
-          {veiculos.map((v) => (
-            <option key={v.id} value={v.id} disabled={emUso.includes(v.id)}>
-              {formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`} {emUso.includes(v.id) ? "(em viagem)" : ""}
-            </option>
-          ))}
-        </select>
-        {veiculo && <p className="mt-1 text-xs text-slate-500">Último km registrado: {km(veiculo.km_atual)}</p>}
+    <form onSubmit={salvar} className="painel max-w-2xl">
+      <div className="painel-cabecalho">
+        <h2 className="painel-titulo">Registro de saída</h2>
       </div>
-      <div>
-        <label className="rotulo" htmlFor="destino">Destino / motivo (opcional)</label>
-        <input id="destino" className="campo" value={destino} onChange={(e) => setDestino(e.target.value)} />
+      <div className="painel-corpo grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="rotulo" htmlFor="veiculo">Veículo <span className="text-perigo">*</span></label>
+          <select id="veiculo" className="campo" value={veiculoId} onChange={(e) => setVeiculoId(e.target.value)} required>
+            <option value="">Selecione…</option>
+            {veiculos.map((v) => (
+              <option key={v.id} value={v.id} disabled={emUso.includes(v.id)}>
+                {formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`} {emUso.includes(v.id) ? "(em viagem)" : ""}
+              </option>
+            ))}
+          </select>
+          {veiculo && <p className="ajuda">Último km registrado: <b className="tabular-nums">{km(veiculo.km_atual)}</b></p>}
+        </div>
+        <div>
+          <label className="rotulo" htmlFor="destino">Destino / finalidade</label>
+          <input id="destino" className="campo" value={destino} onChange={(e) => setDestino(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <FotoNumero
+            rotulo="Odômetro na saída"
+            modo="odometro"
+            unidade="km"
+            referencia={veiculo?.km_atual}
+            valor={kmTexto}
+            onValor={setKmTexto}
+            onFoto={setFoto}
+            fotoObrigatoria
+          />
+        </div>
+        {erro && <p className="erro sm:col-span-2">{erro}</p>}
       </div>
-      <FotoNumero
-        rotulo="Mostrador no início da viagem"
-        modo="odometro"
-        unidade="km"
-        referencia={veiculo?.km_atual}
-        valor={kmTexto}
-        onValor={setKmTexto}
-        onFoto={setFoto}
-        fotoObrigatoria
-      />
-      {erro && <p className="erro">{erro}</p>}
-      <button className="botao w-full" disabled={salvando}>{salvando ? "Salvando…" : "Iniciar viagem"}</button>
+      <div className="flex justify-end gap-2 border-t border-borda bg-superficie-2 px-4 py-3">
+        <Link href="/" className="botao-secundario">Cancelar</Link>
+        <button className="botao" disabled={salvando}>
+          {salvando ? <Loader2 size={15} className="animate-spin" /> : <Gauge size={15} />}
+          {salvando ? "Salvando…" : "Iniciar viagem"}
+        </button>
+      </div>
     </form>
   );
 }

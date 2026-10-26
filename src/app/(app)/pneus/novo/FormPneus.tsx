@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { CheckCircle2, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { Selo } from "@/components/Selo";
@@ -63,69 +65,107 @@ export function FormPneus({ veiculos }: { veiculos: Vehicle[] }) {
 
   if (salvo) {
     return (
-      <div className="card max-w-lg space-y-4">
-        <p className="font-semibold text-emerald-700">Medição salva para {formatarPlaca(veiculo!.placa)}.</p>
-        <Diagrama valores={valores} />
-        <button className="botao w-full" onClick={() => router.push("/")}>Concluir</button>
+      <div className="painel max-w-3xl">
+        <div className="painel-cabecalho">
+          <h2 className="painel-titulo">Medição registrada</h2>
+        </div>
+        <div className="painel-corpo space-y-4">
+          <p className="sucesso flex items-center gap-2">
+            <CheckCircle2 size={15} /> Medição salva para o veículo <b className="mono">{formatarPlaca(veiculo!.placa)}</b>.
+          </p>
+          <Diagrama valores={valores} />
+        </div>
+        <div className="flex justify-end border-t border-borda bg-superficie-2 px-4 py-3">
+          <button className="botao" onClick={() => router.push("/")}>Concluir</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={salvar} className="max-w-2xl space-y-4">
-      <div className="card space-y-2">
-        <label className="rotulo" htmlFor="veiculo">Carro</label>
-        <select id="veiculo" className="campo" value={veiculoId} onChange={(e) => setVeiculoId(e.target.value)} required>
-          <option value="">Selecione…</option>
-          {veiculos.map((v) => (
-            <option key={v.id} value={v.id}>{formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`}</option>
-          ))}
-        </select>
-        <p className="text-xs text-slate-500">
-          Meça o sulco de cada pneu com o medidor e tire a foto do visor. Mínimo legal: {TWI_MINIMO.toLocaleString("pt-BR")} mm
-          (marca TWI). Abaixo de {TWI_ATENCAO.toLocaleString("pt-BR")} mm já é bom planejar a troca.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {PNEUS.map((p) => (
-          <div key={p.campo} className="card">
-            <FotoNumero
-              rotulo={p.rotulo}
-              modo="pneu"
-              unidade="mm"
-              valor={valores[p.campo]}
-              onValor={(v) => setValores((s) => ({ ...s, [p.campo]: v }))}
-              onFoto={(f) => setFotos((s) => ({ ...s, [p.campo]: f }))}
-            />
+    <form onSubmit={salvar} className="grid max-w-[1100px] gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="painel">
+        <div className="painel-cabecalho">
+          <h2 className="painel-titulo">Aferição do sulco</h2>
+        </div>
+        <div className="painel-corpo space-y-4">
+          <div className="max-w-md">
+            <label className="rotulo" htmlFor="veiculo">Veículo <span className="text-perigo">*</span></label>
+            <select id="veiculo" className="campo" value={veiculoId} onChange={(e) => setVeiculoId(e.target.value)} required>
+              <option value="">Selecione…</option>
+              {veiculos.map((v) => (
+                <option key={v.id} value={v.id}>{formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`}</option>
+              ))}
+            </select>
           </div>
-        ))}
+          <div className="grid gap-x-6 gap-y-5 border-t border-borda pt-4 sm:grid-cols-2">
+            {PNEUS.map((p) => (
+              <FotoNumero
+                key={p.campo}
+                rotulo={p.rotulo}
+                modo="pneu"
+                unidade="mm"
+                valor={valores[p.campo]}
+                onValor={(v) => setValores((s) => ({ ...s, [p.campo]: v }))}
+                onFoto={(f) => setFotos((s) => ({ ...s, [p.campo]: f }))}
+              />
+            ))}
+          </div>
+          {erro && <p className="erro">{erro}</p>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-borda bg-superficie-2 px-4 py-3">
+          <Link href="/" className="botao-secundario">Cancelar</Link>
+          <button className="botao" disabled={salvando}>
+            {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {salvando ? "Salvando…" : "Salvar medição"}
+          </button>
+        </div>
       </div>
 
-      <Diagrama valores={valores} />
-      {erro && <p className="erro">{erro}</p>}
-      <button className="botao w-full" disabled={salvando}>{salvando ? "Salvando…" : "Salvar medição"}</button>
+      <div className="space-y-4 self-start">
+        <div className="painel">
+          <div className="painel-cabecalho">
+            <h2 className="painel-titulo">Situação dos pneus</h2>
+          </div>
+          <div className="painel-corpo">
+            <Diagrama valores={valores} />
+          </div>
+        </div>
+        <div className="painel">
+          <div className="painel-cabecalho">
+            <h2 className="painel-titulo">Critérios</h2>
+          </div>
+          <table className="tabela">
+            <tbody>
+              <tr><td><Selo nivel="ok">OK</Selo></td><td className="num">≥ {TWI_ATENCAO.toLocaleString("pt-BR")} mm</td></tr>
+              <tr><td><Selo nivel="atencao">Atenção</Selo></td><td className="num">{TWI_MINIMO.toLocaleString("pt-BR")} a {TWI_ATENCAO.toLocaleString("pt-BR")} mm</td></tr>
+              <tr><td><Selo nivel="critico">Trocar</Selo></td><td className="num">&lt; {TWI_MINIMO.toLocaleString("pt-BR")} mm (TWI)</td></tr>
+            </tbody>
+          </table>
+          <p className="px-4 py-2.5 text-xs text-texto-2">Mínimo legal (Contran): {TWI_MINIMO.toLocaleString("pt-BR")} mm.</p>
+        </div>
+      </div>
     </form>
   );
 }
 
-/** Visão de cima do carro com o status de cada pneu. */
+/** Visão de cima do veículo com a situação de cada pneu. */
 function Diagrama({ valores }: { valores: Record<Campo, string> }) {
   const celula = (campo: Campo, rotulo: string) => {
     const n = paraNumero(valores[campo], "pneu");
     return (
       <div className="flex flex-col items-center gap-1 text-center">
-        <span className="text-xs text-slate-500">{rotulo}</span>
-        <span className="text-lg font-bold">{n === null ? "–" : `${n.toLocaleString("pt-BR")} mm`}</span>
-        {n !== null && <Selo nivel={nivelPneu(n)}>{textoNivel[nivelPneu(n)]}</Selo>}
+        <span className="text-[11px] font-semibold tracking-wider text-texto-2 uppercase">{rotulo}</span>
+        <span className="text-[16px] font-semibold tabular-nums">{n === null ? "—" : `${n.toLocaleString("pt-BR")} mm`}</span>
+        {n !== null ? <Selo nivel={nivelPneu(n)}>{textoNivel[nivelPneu(n)]}</Selo> : <Selo nivel="neutro">Pendente</Selo>}
       </div>
     );
   };
   return (
-    <div className="card grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-5">
       {celula("dianteiro_esquerdo", "Diant. esq.")}
-      <div className="row-span-2 flex h-36 w-16 items-start justify-center rounded-2xl border-2 border-slate-300 pt-2 text-xs text-slate-400">
-        frente
+      <div className="row-span-2 flex h-36 w-14 items-start justify-center rounded-md border-2 border-borda-forte bg-superficie-2 pt-2 text-[10px] font-semibold tracking-wider text-texto-2 uppercase">
+        Frente
       </div>
       {celula("dianteiro_direito", "Diant. dir.")}
       {celula("traseiro_esquerdo", "Tras. esq.")}

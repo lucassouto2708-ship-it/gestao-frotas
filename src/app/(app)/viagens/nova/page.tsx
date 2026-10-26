@@ -1,4 +1,6 @@
-import { Pagina } from "@/components/Pagina";
+import Link from "next/link";
+import { CarFront } from "lucide-react";
+import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { getProfile } from "@/lib/supabase/server";
 import type { Vehicle } from "@/lib/types";
 import { FormNovaViagem } from "./FormNovaViagem";
@@ -12,11 +14,18 @@ export default async function NovaViagem() {
   const emUso = new Set((abertas ?? []).map((t) => t.vehicle_id as string));
 
   return (
-    <Pagina titulo="Iniciar viagem" voltar="/">
+    <Pagina titulo="Iniciar viagem" descricao="Registre a saída do veículo com a foto do odômetro." voltar="/">
       {veiculos?.length ? (
         <FormNovaViagem veiculos={veiculos as Vehicle[]} emUso={[...emUso]} />
       ) : (
-        <p className="card text-slate-600">Nenhum carro cadastrado ainda.</p>
+        <Painel className="max-w-2xl">
+          <EstadoVazio
+            icone={<CarFront size={28} strokeWidth={1.5} />}
+            titulo="Nenhum veículo cadastrado"
+            texto="Cadastre um veículo antes de registrar viagens."
+            acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
+          />
+        </Painel>
       )}
     </Pagina>
   );
