@@ -1,10 +1,20 @@
--- Gestão de Frotas - esquema inicial
--- Rode este arquivo no SQL Editor do Supabase (ou via `supabase db push`).
+-- =====================================================================
+--  GESTÃO DE FROTAS - BANCO DE DADOS
+--
+--  COMO USAR:
+--    1. No Supabase, abra "SQL Editor" > "New query"
+--    2. Copie TODO este arquivo, cole e clique em "Run"
+--    3. Deve aparecer "Success. No rows returned"
+--
+--  Pode rodar de novo quantas vezes quiser: não apaga nenhum dado.
+--  A PRIMEIRA conta criada no app vira ADM automaticamente.
+-- =====================================================================
 
--- =========================================================
--- Perfis de usuário (admin / comum)
--- =========================================================
-create table public.profiles (
+
+-- ---------------------------------------------------------------------
+-- 1. USUÁRIOS (admin / comum)
+-- ---------------------------------------------------------------------
+create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   nome text not null default '',
   email text,
@@ -12,24 +22,30 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
--- Cria o perfil automaticamente quando alguém se cadastra
-create function public.handle_new_user()
+-- Cria o perfil quando alguém se cadastra. Se ainda não existe ADM, vira ADM.
+create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, nome, email)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'nome', ''), new.email);
+  insert into public.profiles (id, nome, email, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'nome', ''),
+    new.email,
+    case when exists (select 1 from public.profiles where role = 'admin') then 'comum' else 'admin' end
+  );
   return new;
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
-create function public.is_admin()
+create or replace function public.is_admin()
 returns boolean
 language sql
 stable
@@ -38,10 +54,11 @@ as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
 $$;
 
--- =========================================================
--- Veículos
--- =========================================================
-create table public.vehicles (
+
+-- ---------------------------------------------------------------------
+-- 2. CARROS
+-- ---------------------------------------------------------------------
+create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
   placa text not null unique check (placa ~ '^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$'),
   modelo text not null default '',
@@ -57,7 +74,7 @@ create table public.vehicles (
 );
 
 -- No cadastro, o km atual e as referências de manutenção partem do km inicial
-create function public.vehicles_before_insert()
+create or replace function public.vehicles_before_insert()
 returns trigger
 language plpgsql
 as $$
@@ -70,14 +87,16 @@ begin
 end;
 $$;
 
+drop trigger if exists vehicles_before_insert on public.vehicles;
 create trigger vehicles_before_insert
   before insert on public.vehicles
   for each row execute function public.vehicles_before_insert();
 
--- =========================================================
--- Viagens (foto do odômetro no início e no fim)
--- =========================================================
-create table public.trips (
+
+-- ---------------------------------------------------------------------
+-- 3. VIAGENS (foto do mostrador no início e no fim)
+-- ---------------------------------------------------------------------
+create table if not exists public.trips (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles (id) on delete cascade,
   user_id uuid not null references public.profiles (id) default auth.uid(),
@@ -93,14 +112,14 @@ create table public.trips (
   check (status = 'em_andamento' or (km_fim is not null and foto_fim is not null and finalizada_em is not null))
 );
 
--- Só pode haver uma viagem em andamento por veículo
-create unique index trips_uma_aberta_por_veiculo
+-- Só pode haver uma viagem em andamento por carro
+create unique index if not exists trips_uma_aberta_por_veiculo
   on public.trips (vehicle_id) where status = 'em_andamento';
 
-create index trips_finalizada_em_idx on public.trips (finalizada_em);
+create index if not exists trips_finalizada_em_idx on public.trips (finalizada_em);
 
--- Mantém o km atual do veículo sempre no maior valor registrado
-create function public.trips_atualiza_km()
+-- Mantém o km atual do carro sempre no maior valor registrado
+create or replace function public.trips_atualiza_km()
 returns trigger
 language plpgsql
 security definer set search_path = public
@@ -113,14 +132,16 @@ begin
 end;
 $$;
 
+drop trigger if exists trips_atualiza_km on public.trips;
 create trigger trips_atualiza_km
   after insert or update of km_fim on public.trips
   for each row execute function public.trips_atualiza_km();
 
--- =========================================================
--- Manutenções (troca de óleo / revisão) - registradas pelo ADM
--- =========================================================
-create table public.maintenances (
+
+-- ---------------------------------------------------------------------
+-- 4. MANUTENÇÕES (troca de óleo / revisão) - registradas pelo ADM
+-- ---------------------------------------------------------------------
+create table if not exists public.maintenances (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles (id) on delete cascade,
   tipo text not null check (tipo in ('oleo', 'revisao')),
@@ -131,7 +152,7 @@ create table public.maintenances (
   created_at timestamptz not null default now()
 );
 
-create function public.maintenances_atualiza_veiculo()
+create or replace function public.maintenances_atualiza_veiculo()
 returns trigger
 language plpgsql
 security definer set search_path = public
@@ -148,14 +169,16 @@ begin
 end;
 $$;
 
+drop trigger if exists maintenances_atualiza_veiculo on public.maintenances;
 create trigger maintenances_atualiza_veiculo
   after insert on public.maintenances
   for each row execute function public.maintenances_atualiza_veiculo();
 
--- =========================================================
--- Medições de pneu (profundidade do sulco em mm, medidor TWI)
--- =========================================================
-create table public.tire_measurements (
+
+-- ---------------------------------------------------------------------
+-- 5. PNEUS (profundidade do sulco em mm, medidor TWI)
+-- ---------------------------------------------------------------------
+create table if not exists public.tire_measurements (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles (id) on delete cascade,
   user_id uuid not null references public.profiles (id) default auth.uid(),
@@ -170,70 +193,100 @@ create table public.tire_measurements (
   created_at timestamptz not null default now()
 );
 
--- =========================================================
--- Segurança (RLS)
--- =========================================================
+
+-- ---------------------------------------------------------------------
+-- 6. PERMISSÕES (quem pode ver e alterar o quê)
+-- ---------------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.vehicles enable row level security;
 alter table public.trips enable row level security;
 alter table public.maintenances enable row level security;
 alter table public.tire_measurements enable row level security;
 
--- profiles: cada um vê o seu; ADM vê e altera todos
+-- Usuários: cada um vê o seu; ADM vê e altera todos
+drop policy if exists "perfil proprio ou admin" on public.profiles;
 create policy "perfil proprio ou admin" on public.profiles
   for select using (id = auth.uid() or public.is_admin());
+drop policy if exists "admin altera perfis" on public.profiles;
 create policy "admin altera perfis" on public.profiles
   for update using (public.is_admin());
 
--- vehicles: todos os usuários logados podem listar (para escolher o carro da viagem)
--- e cadastrar; somente ADM altera ou exclui
+-- Carros: todos os logados listam e cadastram; só ADM altera ou exclui
+drop policy if exists "logado lista veiculos" on public.vehicles;
 create policy "logado lista veiculos" on public.vehicles
   for select to authenticated using (true);
+drop policy if exists "logado cadastra veiculo" on public.vehicles;
 create policy "logado cadastra veiculo" on public.vehicles
   for insert to authenticated with check (created_by = auth.uid());
+drop policy if exists "admin altera veiculo" on public.vehicles;
 create policy "admin altera veiculo" on public.vehicles
   for update using (public.is_admin());
+drop policy if exists "admin exclui veiculo" on public.vehicles;
 create policy "admin exclui veiculo" on public.vehicles
   for delete using (public.is_admin());
 
--- trips: usuário comum vê e finaliza as próprias; ADM vê todas
+-- Viagens: usuário comum vê e finaliza as próprias; ADM vê todas
+drop policy if exists "viagens proprias ou admin" on public.trips;
 create policy "viagens proprias ou admin" on public.trips
   for select using (user_id = auth.uid() or public.is_admin());
+drop policy if exists "inicia viagem propria" on public.trips;
 create policy "inicia viagem propria" on public.trips
   for insert to authenticated with check (user_id = auth.uid() and status = 'em_andamento');
+drop policy if exists "finaliza viagem propria" on public.trips;
 create policy "finaliza viagem propria" on public.trips
   for update using ((user_id = auth.uid() and status = 'em_andamento') or public.is_admin())
   with check (user_id = auth.uid() or public.is_admin());
+drop policy if exists "admin exclui viagem" on public.trips;
 create policy "admin exclui viagem" on public.trips
   for delete using (public.is_admin());
 -- Ao finalizar, só os campos de fim podem ser preenchidos
 revoke update on public.trips from authenticated;
 grant update (km_fim, foto_fim, finalizada_em, status) on public.trips to authenticated;
 
--- maintenances: todos veem (alertas), só ADM registra
+-- Manutenções: todos veem (alertas); só ADM registra
+drop policy if exists "logado ve manutencoes" on public.maintenances;
 create policy "logado ve manutencoes" on public.maintenances
   for select to authenticated using (true);
+drop policy if exists "admin registra manutencao" on public.maintenances;
 create policy "admin registra manutencao" on public.maintenances
   for insert with check (public.is_admin());
 
--- tire_measurements: usuário vê as próprias; ADM vê todas
+-- Pneus: usuário vê as próprias medições; ADM vê todas
+drop policy if exists "medicoes proprias ou admin" on public.tire_measurements;
 create policy "medicoes proprias ou admin" on public.tire_measurements
   for select using (user_id = auth.uid() or public.is_admin());
+drop policy if exists "registra medicao propria" on public.tire_measurements;
 create policy "registra medicao propria" on public.tire_measurements
   for insert to authenticated with check (user_id = auth.uid());
 
--- =========================================================
--- Storage: fotos dos mostradores (bucket privado)
--- Caminho dos arquivos: <user_id>/<arquivo>.jpg
--- =========================================================
+
+-- ---------------------------------------------------------------------
+-- 7. FOTOS (pasta privada "fotos"; cada usuário grava na própria subpasta)
+-- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('fotos', 'fotos', false)
 on conflict (id) do nothing;
 
+drop policy if exists "envia fotos na propria pasta" on storage.objects;
 create policy "envia fotos na propria pasta" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "ve fotos proprias ou admin" on storage.objects;
 create policy "ve fotos proprias ou admin" on storage.objects
   for select to authenticated
   using (bucket_id = 'fotos' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin()));
+
+
+-- ---------------------------------------------------------------------
+-- 8. CONTAS QUE JÁ EXISTIAM (se você criou conta antes de rodar este arquivo)
+-- ---------------------------------------------------------------------
+insert into public.profiles (id, nome, email)
+select id, coalesce(raw_user_meta_data ->> 'nome', ''), email
+from auth.users
+on conflict (id) do nothing;
+
+-- Se ainda não há ADM, a conta mais antiga vira ADM
+update public.profiles set role = 'admin'
+where not exists (select 1 from public.profiles where role = 'admin')
+  and id = (select u.id from auth.users u join public.profiles p on p.id = u.id order by u.created_at limit 1);

@@ -28,26 +28,32 @@ Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Supabase (Postgres, Aut
 
 ## Como configurar
 
-1. **Crie um projeto** em [supabase.com](https://supabase.com).
-2. No **SQL Editor** do Supabase, cole e rode o conteúdo de [`supabase/migrations/0001_inicial.sql`](supabase/migrations/0001_inicial.sql). Isso cria as tabelas, as regras de acesso e o bucket privado `fotos`.
-3. Copie `.env.example` para `.env.local` e preencha com os dados de *Project Settings → API*:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=...
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-   ```
-4. Rode localmente:
-   ```bash
-   npm install
-   npm run dev
-   ```
-   Abra http://localhost:3000 e crie sua conta.
-5. **Torne-se ADM.** Toda conta nova entra como *comum*. Para o primeiro ADM, rode no SQL Editor:
-   ```sql
-   update public.profiles set role = 'admin' where email = 'seu@email.com';
-   ```
-   Depois disso, os próximos ADMs podem ser promovidos pela tela **Usuários**.
+### Passo 1: criar o banco (uma vez só)
 
-> Por padrão o Supabase exige confirmação de e-mail no cadastro. Para testar mais rápido, desligue em *Authentication → Sign In / Providers → Email → Confirm email*.
+1. Crie um projeto em [supabase.com](https://supabase.com).
+2. No menu da esquerda, clique em **SQL Editor** e depois em **New query**.
+3. Abra o arquivo [`supabase/banco.sql`](supabase/banco.sql). No GitHub, use o botão **Copy raw file** (ícone de copiar, no canto superior direito do arquivo).
+4. Cole no SQL Editor e clique em **Run**.
+5. Deve aparecer **"Success. No rows returned"**. Pronto, o banco está criado.
+
+> Se der algum erro, pode rodar o arquivo de novo: ele não apaga nada.
+
+### Passo 2: ligar o app ao banco
+
+No Supabase, vá em **Project Settings → API** e copie a *Project URL* e a chave *anon public*. Crie um arquivo `.env.local` (copie o `.env.example`) e preencha:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=cole-aqui-a-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=cole-aqui-a-anon-key
+```
+
+### Passo 3: criar sua conta
+
+Rode o app (`npm install` e depois `npm run dev`), abra http://localhost:3000 e clique em **Cadastre-se**.
+
+**A primeira conta criada vira ADM automaticamente.** As próximas entram como usuário comum. Para promover alguém a ADM, use a tela **Usuários** dentro do app.
+
+> Por padrão o Supabase pede confirmação por e-mail. Para testar mais rápido, desligue em *Authentication → Sign In / Providers → Email → Confirm email*.
 
 ## Publicar (Vercel)
 
@@ -56,7 +62,7 @@ Importe o repositório na [Vercel](https://vercel.com), cadastre as duas variáv
 ## Estrutura
 
 ```
-supabase/migrations/   esquema do banco, gatilhos e permissões
+supabase/banco.sql     banco completo: copiar e colar no SQL Editor
 src/proxy.ts           exige login em todas as páginas (exceto /login)
 src/lib/ocr.ts         leitura dos números nas fotos (Tesseract.js)
 src/lib/regras.ts      regras de óleo, revisão e pneus (TWI)

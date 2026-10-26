@@ -11,7 +11,7 @@ export default async function Usuarios() {
   return (
     <Pagina titulo="Usuários" voltar="/admin">
       <p className="mb-4 text-sm text-slate-600">
-        Todo mundo que cria conta entra como <b>comum</b>. Promova aqui quem deve ver o painel da frota.
+        A primeira conta criada é ADM; as demais entram como <b>comum</b>. Promova aqui quem deve ver o painel da frota.
       </p>
       <ul className="card divide-y divide-slate-100 p-0">
         {usuarios.map((u) => (
