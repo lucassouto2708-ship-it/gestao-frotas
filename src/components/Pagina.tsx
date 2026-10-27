@@ -35,15 +35,17 @@ export function Painel({
   children,
   className = "",
   semPadding,
+  id,
 }: {
   titulo?: React.ReactNode;
   acoes?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   semPadding?: boolean;
+  id?: string;
 }) {
   return (
-    <section className={`painel ${className}`}>
+    <section id={id} className={`painel ${className}`}>
       {titulo && (
         <div className="painel-cabecalho">
           <h2 className="painel-titulo">{titulo}</h2>

@@ -45,7 +45,7 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
           </Painel>
           <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin={admin} />
         </div>
-        <Painel titulo="Registrar manutenção" className="self-start">
+        <Painel titulo="Registrar manutenção" className="order-first self-start scroll-mt-28 xl:order-none" id="registrar">
           <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
         </Painel>
       </div>

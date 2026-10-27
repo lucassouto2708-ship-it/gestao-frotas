@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CarFront, PlusSquare } from "lucide-react";
+import { CarFront, PlusSquare, Wrench } from "lucide-react";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { data, formatarPlaca, km, statusOleo, statusRevisao } from "@/lib/regras";
@@ -16,7 +16,7 @@ export default async function Veiculos() {
   return (
     <Pagina
       titulo="Veículos"
-      descricao="Consulte a ficha de cada veículo, registre manutenções e veja o histórico."
+      descricao="Clique em “Registrar manutenção / histórico” para lançar troca de óleo, revisão e outros serviços e ver o histórico do veículo."
       acoes={<Link href="/veiculos/novo" className="botao"><PlusSquare size={15} /> Cadastrar veículo</Link>}
     >
       <Painel titulo="Frota" acoes={<span className="text-xs text-texto-2">{veiculos.length} veículos</span>} semPadding>
@@ -36,6 +36,7 @@ export default async function Veiculos() {
                   <th className="num">Km atual</th>
                   <th>Troca de óleo</th>
                   <th>Revisão</th>
+                  <th className="num"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -57,6 +58,11 @@ export default async function Veiculos() {
                           <span className="text-xs text-texto-2">{d ? `última em ${data(d)}` : "sem registro"}</span>
                         </td>
                       ))}
+                      <td className="num">
+                        <Link href={`/veiculos/${v.id}#registrar`} className="botao botao-pequeno whitespace-nowrap">
+                          <Wrench size={13} /> Registrar manutenção / histórico
+                        </Link>
+                      </td>
                     </tr>
                   );
                 })}
