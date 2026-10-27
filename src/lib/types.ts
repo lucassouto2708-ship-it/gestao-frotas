@@ -76,3 +76,10 @@ export type TireMeasurement = {
   foto_td: string | null;
   created_at: string;
 };
+
+export type Configuracoes = {
+  intervalo_oleo: number;
+  intervalo_revisao: number;
+  atualizado_por: string | null;
+  atualizado_em: string | null;
+};

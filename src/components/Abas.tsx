@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarFront, ClipboardList, Gauge, LayoutList, PlusSquare, Users, Wrench } from "lucide-react";
+import { CarFront, ClipboardList, Gauge, LayoutList, PlusSquare, SlidersHorizontal, Users, Wrench } from "lucide-react";
 
 const ABAS_COMUNS = [
   { href: "/", rotulo: "Início", icone: LayoutList, exato: true },
@@ -15,6 +15,7 @@ const ABAS_COMUNS = [
 const ABAS_ADMIN = [
   { href: "/admin", rotulo: "Painel da frota", icone: CarFront, exato: false },
   { href: "/admin/usuarios", rotulo: "Usuários", icone: Users },
+  { href: "/admin/parametros", rotulo: "Parâmetros", icone: SlidersHorizontal },
 ];
 
 export function Abas({ admin }: { admin: boolean }) {

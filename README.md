@@ -20,7 +20,8 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 | Medir pneus | ✅ (só as próprias) | ✅ |
 | Painel com todos os carros, km do mês, alertas | ❌ | ✅ |
 | Ver fotos e histórico de todos | ❌ | ✅ |
-| Alterar intervalos, excluir carro, vincular/desvincular motoristas | ❌ | ✅ |
+| Parâmetros de manutenção: padrão da frota e intervalos de cada carro (aba Parâmetros) | ❌ | ✅ |
+| Excluir carro, vincular/desvincular motoristas | ❌ | ✅ |
 | Promover usuários a ADM | ❌ | ✅ |
 
 As permissões são garantidas no próprio banco (Row Level Security do Supabase), não só na tela.

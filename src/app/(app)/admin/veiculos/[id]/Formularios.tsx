@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -54,6 +55,9 @@ export function FormConfigVeiculo({ veiculo }: { veiculo: Vehicle }) {
           <input className="campo text-right tabular-nums" type="number" min={1} value={revisao} onChange={(e) => setRevisao(e.target.value)} />
         </label>
       </div>
+      <p className="ajuda -mt-1">
+        Para mudar o padrão da frota ou vários carros de uma vez, use <Link href="/admin/parametros" className="link">Parâmetros</Link>.
+      </p>
       <label className="block">
         <span className="rotulo">Corrigir km atual</span>
         <input className="campo text-right tabular-nums" inputMode="numeric" value={kmAtual} onChange={(e) => setKmAtual(e.target.value)} />

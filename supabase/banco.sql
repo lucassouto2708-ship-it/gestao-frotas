@@ -75,6 +75,32 @@ create table if not exists public.vehicles (
   created_at timestamptz not null default now()
 );
 
+-- Parâmetros padrão da frota (uma linha só), definidos pelo ADM
+create table if not exists public.configuracoes (
+  id boolean primary key default true check (id),
+  intervalo_oleo integer not null default 10000 check (intervalo_oleo > 0),
+  intervalo_revisao integer not null default 20000 check (intervalo_revisao > 0),
+  atualizado_por uuid references public.profiles (id),
+  atualizado_em timestamptz
+);
+insert into public.configuracoes (id) values (true) on conflict do nothing;
+
+create or replace function public.configuracoes_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.atualizado_por := auth.uid();
+  new.atualizado_em := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists configuracoes_before_update on public.configuracoes;
+create trigger configuracoes_before_update
+  before update on public.configuracoes
+  for each row execute function public.configuracoes_before_update();
+
 -- Atualização de bancos criados antes destas colunas existirem
 alter table public.vehicles add column if not exists data_ultima_troca_oleo date;
 alter table public.vehicles add column if not exists data_ultima_revisao date;
@@ -88,6 +114,9 @@ as $$
 begin
   new.placa := upper(regexp_replace(new.placa, '[^A-Za-z0-9]', '', 'g'));
   new.km_atual := new.km_inicial;
+  -- Intervalos de manutenção: o padrão da frota definido pelo ADM
+  select c.intervalo_oleo, c.intervalo_revisao into new.intervalo_oleo, new.intervalo_revisao
+  from public.configuracoes c where c.id;
   -- Sem data informada não há registro no histórico: conta a partir do km inicial
   if new.data_ultima_troca_oleo is null then new.km_ultima_troca_oleo := new.km_inicial; end if;
   if new.data_ultima_revisao is null then new.km_ultima_revisao := new.km_inicial; end if;
@@ -364,6 +393,15 @@ alter table public.trips enable row level security;
 alter table public.maintenances enable row level security;
 alter table public.tire_measurements enable row level security;
 alter table public.vehicle_users enable row level security;
+alter table public.configuracoes enable row level security;
+
+-- Parâmetros da frota: todos leem; só ADM altera
+drop policy if exists "logado le configuracoes" on public.configuracoes;
+create policy "logado le configuracoes" on public.configuracoes
+  for select to authenticated using (true);
+drop policy if exists "admin altera configuracoes" on public.configuracoes;
+create policy "admin altera configuracoes" on public.configuracoes
+  for update using (public.is_admin()) with check (public.is_admin());
 
 -- Usuários: cada um vê o seu e os de quem divide carro com ele; ADM vê e altera todos
 drop policy if exists "perfil proprio ou admin" on public.profiles;
