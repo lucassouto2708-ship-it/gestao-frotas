@@ -7,9 +7,9 @@ import { FormFinalizar } from "./FormFinalizar";
 export default async function FinalizarViagem({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase } = await getProfile();
-  const { data } = await supabase.from("trips").select("*, vehicles(placa, modelo)").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("trips").select("*, vehicles(*)").eq("id", id).maybeSingle();
   if (!data) notFound();
-  const viagem = data as Trip & { vehicles: Pick<Vehicle, "placa" | "modelo"> };
+  const viagem = data as Trip & { vehicles: Vehicle };
   if (viagem.status !== "em_andamento") redirect("/");
 
   return (

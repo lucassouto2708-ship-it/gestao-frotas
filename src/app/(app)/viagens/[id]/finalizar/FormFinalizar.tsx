@@ -6,11 +6,12 @@ import { Flag, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
-import { dataHora, formatarPlaca, km } from "@/lib/regras";
+import { AvisoManutencao } from "@/components/manutencao/AvisoManutencao";
+import { dataHora, formatarPlaca, km, pendencias } from "@/lib/regras";
 import { createClient } from "@/lib/supabase/client";
 import type { Trip, Vehicle } from "@/lib/types";
 
-export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Pick<Vehicle, "placa" | "modelo"> } }) {
+export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Vehicle } }) {
   const router = useRouter();
   const [kmTexto, setKmTexto] = useState("");
   const [foto, setFoto] = useState<Blob | null>(null);
@@ -18,6 +19,8 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Pick<Vehi
   const [salvando, setSalvando] = useState(false);
   const kmFim = paraNumero(kmTexto, "odometro");
   const rodado = kmFim !== null && kmFim >= viagem.km_inicio ? kmFim - viagem.km_inicio : null;
+  // Com o km de chegada, o carro passa do limite de troca de óleo / revisão?
+  const aviso = rodado !== null ? pendencias(viagem.vehicles, kmFim!) : [];
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +39,7 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Pick<Vehi
         .update({ km_fim: kmFim, foto_fim: caminho, finalizada_em: new Date().toISOString(), status: "finalizada" })
         .eq("id", viagem.id);
       if (error) throw new Error(error.message);
-      router.push("/");
+      router.push(`/?finalizada=${viagem.id}`);
       router.refresh();
     } catch (err) {
       setErro((err as Error).message);
@@ -79,6 +82,13 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Pick<Vehi
             <span className="text-[16px] font-semibold tabular-nums">{km(rodado)}</span>
           </div>
         )}
+        <AvisoManutencao
+          veiculoId={viagem.vehicle_id}
+          placa={viagem.vehicles.placa}
+          itens={aviso}
+          titulo="Ao finalizar esta viagem, o veículo precisará de:"
+          semBotao
+        />
         {erro && <p className="erro">{erro}</p>}
       </div>
       <div className="flex justify-end gap-2 border-t border-borda bg-superficie-2 px-4 py-3">

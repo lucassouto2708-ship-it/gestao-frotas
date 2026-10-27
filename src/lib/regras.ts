@@ -85,3 +85,23 @@ export const dinheiro = (n: number) => n.toLocaleString("pt-BR", { style: "curre
 export const data = (iso: string) => iso.split("-").reverse().join("/");
 
 export const hojeISO = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+
+export type Pendencia = { servico: "Troca de óleo" | "Revisão"; nivel: Exclude<Nivel, "ok">; texto: string };
+
+/** O que precisa ser feito no veículo (óleo/revisão em breve ou vencidos). `kmAtual` permite simular um km. */
+export function pendencias(v: Vehicle, kmAtual = v.km_atual): Pendencia[] {
+  const veiculo = { ...v, km_atual: Math.max(v.km_atual, kmAtual) };
+  const lista: Pendencia[] = [];
+  for (const [servico, s] of [["Troca de óleo", statusOleo(veiculo)], ["Revisão", statusRevisao(veiculo)]] as const) {
+    if (s.nivel === "ok") continue;
+    lista.push({
+      servico,
+      nivel: s.nivel,
+      texto:
+        s.nivel === "critico"
+          ? `vencida: passou ${km(-s.faltam)} do limite (prevista com ${km(s.proximaKm)})`
+          : `em breve: faltam ${km(s.faltam)} (prevista com ${km(s.proximaKm)})`,
+    });
+  }
+  return lista.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === "critico" ? -1 : 1));
+}
