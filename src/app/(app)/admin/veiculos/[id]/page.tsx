@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
-import { Camera, ClipboardList, Route, Wrench } from "lucide-react";
+import { Camera, ClipboardList, Route } from "lucide-react";
+import { FormManutencao } from "@/components/manutencao/FormManutencao";
+import { HistoricoManutencao, type ManutencaoComUsuario } from "@/components/manutencao/HistoricoManutencao";
+import { StatusManutencao } from "@/components/manutencao/StatusManutencao";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
-import { PNEUS, dataHora, formatarPlaca, km, nivelPneu, statusOleo, statusRevisao } from "@/lib/regras";
+import { PNEUS, dataHora, formatarPlaca, km, nivelPneu } from "@/lib/regras";
 import { requireAdmin } from "@/lib/supabase/server";
-import type { Maintenance, Profile, TireMeasurement, Trip, Vehicle } from "@/lib/types";
-import { FormConfigVeiculo, FormManutencao } from "./Formularios";
+import type { Profile, TireMeasurement, Trip, Vehicle } from "@/lib/types";
+import { FormConfigVeiculo } from "./Formularios";
 
 type ComUsuario<T> = T & { profiles: Pick<Profile, "nome" | "email"> | null };
 
@@ -17,7 +20,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
   const [{ data: v }, { data: viagens }, { data: manutencoes }, { data: medicoes }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
     supabase.from("trips").select("*, profiles(nome, email)").eq("vehicle_id", id).order("iniciada_em", { ascending: false }).limit(50),
-    supabase.from("maintenances").select("*").eq("vehicle_id", id).order("km", { ascending: false }),
+    supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
     supabase.from("tire_measurements").select("*, profiles(nome, email)").eq("vehicle_id", id).order("created_at", { ascending: false }).limit(10),
   ]);
   if (!v) notFound();
@@ -28,8 +31,6 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     ...listaViagens.flatMap((t) => [t.foto_inicio, t.foto_fim]),
     ...listaMedicoes.flatMap((m) => PNEUS.map((p) => m[p.foto])),
   ]);
-  const oleo = statusOleo(v);
-  const revisao = statusRevisao(v);
   const nome = (p: ComUsuario<unknown>["profiles"]) => p?.nome || p?.email || "—";
   const Foto = ({ caminho, rotulo }: { caminho: string | null; rotulo: string }) =>
     caminho && fotos[caminho] ? (
@@ -38,7 +39,6 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
         <span className="sr-only">{rotulo}</span>
       </a>
     ) : null;
-  const textoNivel = (n: "ok" | "atencao" | "critico") => (n === "ok" ? "Em dia" : n === "atencao" ? "Em breve" : "Vencida");
 
   return (
     <Pagina
@@ -62,31 +62,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
                 </div>
               ))}
             </dl>
-            <div className="grid sm:grid-cols-2">
-              {[
-                { titulo: "Troca de óleo", s: oleo },
-                { titulo: "Revisão", s: revisao },
-              ].map(({ titulo, s }) => (
-                <div key={titulo} className="border-borda px-4 py-3 text-[13px] sm:border-r sm:last:border-r-0">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="font-semibold">{titulo}</span>
-                    <Selo nivel={s.nivel}>{textoNivel(s.nivel)}</Selo>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-sm bg-superficie-2 ring-1 ring-borda">
-                    <div
-                      className={`h-full ${s.nivel === "ok" ? "bg-sucesso" : s.nivel === "atencao" ? "bg-alerta" : "bg-perigo"}`}
-                      style={{ width: `${Math.min(100, Math.max(0, (s.rodado / s.intervalo) * 100))}%` }}
-                    />
-                  </div>
-                  <div className="mt-1.5 flex justify-between text-xs text-texto-2 tabular-nums">
-                    <span>Intervalo {km(s.intervalo)} · próxima em {km(s.proximaKm)}</span>
-                    <span className={s.nivel === "critico" ? "font-semibold text-perigo" : ""}>
-                      {s.faltam > 0 ? `faltam ${km(s.faltam)}` : `excedido ${km(-s.faltam)}`}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <StatusManutencao veiculo={v} />
           </Painel>
 
           <Painel titulo="Medições de pneus" acoes={<span className="text-xs text-texto-2">Últimas 10</span>} semPadding>
@@ -159,39 +135,13 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
               </div>
             )}
           </Painel>
+
+          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin />
         </div>
 
         <div className="space-y-4 self-start">
           <Painel titulo="Registrar manutenção">
             <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
-          </Painel>
-
-          <Painel titulo="Histórico de manutenção" semPadding>
-            {(manutencoes ?? []).length === 0 ? (
-              <EstadoVazio icone={<Wrench size={24} strokeWidth={1.5} />} titulo="Nenhuma manutenção registrada" />
-            ) : (
-              <table className="tabela">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Serviço</th>
-                    <th className="num">Km</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {((manutencoes ?? []) as Maintenance[]).map((m) => (
-                    <tr key={m.id}>
-                      <td className="whitespace-nowrap">{new Date(`${m.realizada_em}T12:00:00`).toLocaleDateString("pt-BR")}</td>
-                      <td>
-                        {m.tipo === "oleo" ? "Troca de óleo" : "Revisão"}
-                        {m.observacao && <p className="text-xs text-texto-2">{m.observacao}</p>}
-                      </td>
-                      <td className="num">{km(m.km)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </Painel>
 
           <Painel titulo="Configurações do veículo">

@@ -4,7 +4,7 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 
 - **Cadastro de carros**: placa, modelo e km inicial do mostrador (com foto opcional).
 - **Viagens**: o motorista tira foto do mostrador na saída e na chegada. O app calcula os km rodados.
-- **Manutenção**: aviso de troca de óleo (padrão a cada **10.000 km**) e revisão (padrão a cada **20.000 km**), com alerta ao atingir 90% do intervalo. O ADM registra a manutenção feita e o contador zera. Os intervalos podem ser alterados por carro.
+- **Manutenção**: aviso de troca de óleo (padrão a cada **10.000 km**) e revisão (padrão a cada **20.000 km**), com alerta ao atingir 90% do intervalo. No cadastro do carro dá para informar a última troca de óleo e a última revisão. Depois, qualquer usuário registra serviços (óleo, revisão, pneus, freios, bateria, outros) com km, data e custo, e cada carro tem seu **histórico de manutenção**. Troca de óleo e revisão zeram o contador. Só o ADM exclui registros. Os intervalos podem ser alterados por carro.
 - **Pneus (TWI)**: medição do sulco dos 4 pneus (dianteiro/traseiro, esquerdo/direito) com foto do medidor. Abaixo de 1,6 mm (TWI, mínimo legal) aparece "Trocar"; abaixo de 3 mm, "Atenção".
 - **Leitura automática das fotos (OCR)**: o [Tesseract.js](https://github.com/naptha/tesseract.js) roda no próprio navegador, de graça e sem chave de API. Ele lê o número da foto e preenche o campo. O usuário sempre confere e pode corrigir.
 
@@ -12,12 +12,14 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 
 | | Comum | ADM |
 |---|---|---|
-| Cadastrar carro | ✅ | ✅ |
+| Cadastrar carro (com última troca de óleo/revisão) | ✅ | ✅ |
+| Registrar manutenção e ver histórico do carro | ✅ | ✅ |
+| Excluir registro de manutenção | ❌ | ✅ |
 | Iniciar/finalizar viagem com fotos | ✅ (só as próprias) | ✅ |
 | Medir pneus | ✅ (só as próprias) | ✅ |
 | Painel com todos os carros, km do mês, alertas | ❌ | ✅ |
 | Ver fotos e histórico de todos | ❌ | ✅ |
-| Registrar manutenção, alterar intervalos, excluir carro | ❌ | ✅ |
+| Alterar intervalos, excluir carro | ❌ | ✅ |
 | Promover usuários a ADM | ❌ | ✅ |
 
 As permissões são garantidas no próprio banco (Row Level Security do Supabase), não só na tela.
@@ -37,6 +39,8 @@ Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Supabase (Postgres, Aut
 5. Deve aparecer **"Success. No rows returned"**. Pronto, o banco está criado.
 
 > Se der algum erro, pode rodar o arquivo de novo: ele não apaga nada.
+>
+> **Atualizações do app:** quando o `banco.sql` mudar, basta rodá-lo de novo do mesmo jeito. Ele adiciona o que falta e mantém os dados.
 
 ### Passo 2: ligar o app ao banco
 

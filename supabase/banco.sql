@@ -69,11 +69,18 @@ create table if not exists public.vehicles (
   intervalo_revisao integer not null default 20000 check (intervalo_revisao > 0),
   km_ultima_troca_oleo integer not null,
   km_ultima_revisao integer not null,
+  data_ultima_troca_oleo date,
+  data_ultima_revisao date,
   created_by uuid references public.profiles (id) default auth.uid(),
   created_at timestamptz not null default now()
 );
 
--- No cadastro, o km atual e as referências de manutenção partem do km inicial
+-- Atualização de bancos criados antes destas colunas existirem
+alter table public.vehicles add column if not exists data_ultima_troca_oleo date;
+alter table public.vehicles add column if not exists data_ultima_revisao date;
+
+-- No cadastro, o km atual parte do km inicial. A última troca de óleo / revisão
+-- pode ser informada; se não for, conta a partir do km inicial.
 create or replace function public.vehicles_before_insert()
 returns trigger
 language plpgsql
@@ -81,8 +88,14 @@ as $$
 begin
   new.placa := upper(regexp_replace(new.placa, '[^A-Za-z0-9]', '', 'g'));
   new.km_atual := new.km_inicial;
+  -- Sem data informada não há registro no histórico: conta a partir do km inicial
+  if new.data_ultima_troca_oleo is null then new.km_ultima_troca_oleo := new.km_inicial; end if;
+  if new.data_ultima_revisao is null then new.km_ultima_revisao := new.km_inicial; end if;
   new.km_ultima_troca_oleo := coalesce(new.km_ultima_troca_oleo, new.km_inicial);
   new.km_ultima_revisao := coalesce(new.km_ultima_revisao, new.km_inicial);
+  if new.km_ultima_troca_oleo > new.km_inicial or new.km_ultima_revisao > new.km_inicial then
+    raise exception 'O km da última troca de óleo/revisão não pode ser maior que o km atual do veículo.';
+  end if;
   return new;
 end;
 $$;
@@ -139,18 +152,51 @@ create trigger trips_atualiza_km
 
 
 -- ---------------------------------------------------------------------
--- 4. MANUTENÇÕES (troca de óleo / revisão) - registradas pelo ADM
+-- 4. MANUTENÇÕES (histórico: troca de óleo, revisão, pneus, freios...)
 -- ---------------------------------------------------------------------
 create table if not exists public.maintenances (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles (id) on delete cascade,
-  tipo text not null check (tipo in ('oleo', 'revisao')),
+  tipo text not null,
   km integer not null check (km >= 0),
+  custo numeric(10, 2) check (custo is null or custo >= 0),
   observacao text not null default '',
   user_id uuid references public.profiles (id) default auth.uid(),
   realizada_em date not null default current_date,
   created_at timestamptz not null default now()
 );
+
+-- Atualização de bancos criados antes: custo e novos tipos de serviço
+alter table public.maintenances add column if not exists custo numeric(10, 2) check (custo is null or custo >= 0);
+alter table public.maintenances drop constraint if exists maintenances_tipo_check;
+alter table public.maintenances add constraint maintenances_tipo_check
+  check (tipo in ('oleo', 'revisao', 'pneus', 'freios', 'bateria', 'outro'));
+
+create index if not exists maintenances_vehicle_idx on public.maintenances (vehicle_id, realizada_em desc);
+
+-- Recalcula a última troca de óleo e a última revisão do carro a partir do histórico
+-- (vale para inclusão e exclusão de registros). Sem registro, conta do km inicial.
+create or replace function public.recalcular_manutencao(vid uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+  update public.vehicles v set
+    km_ultima_troca_oleo = coalesce(o.km, v.km_inicial),
+    data_ultima_troca_oleo = o.realizada_em,
+    km_ultima_revisao = coalesce(r.km, v.km_inicial),
+    data_ultima_revisao = r.realizada_em
+  from (select 1) _
+  left join lateral (
+    select km, realizada_em from public.maintenances
+    where vehicle_id = vid and tipo = 'oleo' order by km desc, realizada_em desc limit 1
+  ) o on true
+  left join lateral (
+    select km, realizada_em from public.maintenances
+    where vehicle_id = vid and tipo = 'revisao' order by km desc, realizada_em desc limit 1
+  ) r on true
+  where v.id = vid;
+$$;
 
 create or replace function public.maintenances_atualiza_veiculo()
 returns trigger
@@ -158,21 +204,44 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  if new.tipo = 'oleo' then
-    update public.vehicles set km_ultima_troca_oleo = new.km, km_atual = greatest(km_atual, new.km)
-     where id = new.vehicle_id;
-  else
-    update public.vehicles set km_ultima_revisao = new.km, km_atual = greatest(km_atual, new.km)
-     where id = new.vehicle_id;
+  if tg_op = 'DELETE' then
+    perform public.recalcular_manutencao(old.vehicle_id);
+    return old;
   end if;
+  update public.vehicles set km_atual = greatest(km_atual, new.km) where id = new.vehicle_id;
+  perform public.recalcular_manutencao(new.vehicle_id);
   return new;
 end;
 $$;
 
 drop trigger if exists maintenances_atualiza_veiculo on public.maintenances;
 create trigger maintenances_atualiza_veiculo
-  after insert on public.maintenances
+  after insert or update or delete on public.maintenances
   for each row execute function public.maintenances_atualiza_veiculo();
+
+-- Última troca de óleo / revisão informadas no cadastro entram no histórico
+create or replace function public.vehicles_after_insert()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if new.data_ultima_troca_oleo is not null then
+    insert into public.maintenances (vehicle_id, tipo, km, realizada_em, observacao, user_id)
+    values (new.id, 'oleo', new.km_ultima_troca_oleo, new.data_ultima_troca_oleo, 'Informado no cadastro do veículo', new.created_by);
+  end if;
+  if new.data_ultima_revisao is not null then
+    insert into public.maintenances (vehicle_id, tipo, km, realizada_em, observacao, user_id)
+    values (new.id, 'revisao', new.km_ultima_revisao, new.data_ultima_revisao, 'Informado no cadastro do veículo', new.created_by);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists vehicles_after_insert on public.vehicles;
+create trigger vehicles_after_insert
+  after insert on public.vehicles
+  for each row execute function public.vehicles_after_insert();
 
 
 -- ---------------------------------------------------------------------
@@ -243,13 +312,17 @@ create policy "admin exclui viagem" on public.trips
 revoke update on public.trips from authenticated;
 grant update (km_fim, foto_fim, finalizada_em, status) on public.trips to authenticated;
 
--- Manutenções: todos veem (alertas); só ADM registra
+-- Manutenções: todos veem e registram; só ADM exclui
 drop policy if exists "logado ve manutencoes" on public.maintenances;
 create policy "logado ve manutencoes" on public.maintenances
   for select to authenticated using (true);
 drop policy if exists "admin registra manutencao" on public.maintenances;
-create policy "admin registra manutencao" on public.maintenances
-  for insert with check (public.is_admin());
+drop policy if exists "logado registra manutencao" on public.maintenances;
+create policy "logado registra manutencao" on public.maintenances
+  for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "admin exclui manutencao" on public.maintenances;
+create policy "admin exclui manutencao" on public.maintenances
+  for delete using (public.is_admin());
 
 -- Pneus: usuário vê as próprias medições; ADM vê todas
 drop policy if exists "medicoes proprias ou admin" on public.tire_measurements;
@@ -290,3 +363,9 @@ on conflict (id) do nothing;
 update public.profiles set role = 'admin'
 where not exists (select 1 from public.profiles where role = 'admin')
   and id = (select u.id from auth.users u join public.profiles p on p.id = u.id order by u.created_at limit 1);
+
+
+-- ---------------------------------------------------------------------
+-- 9. RECÁLCULO (preenche última troca de óleo/revisão a partir do histórico)
+-- ---------------------------------------------------------------------
+select public.recalcular_manutencao(id) from public.vehicles;

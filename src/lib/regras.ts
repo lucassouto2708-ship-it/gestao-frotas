@@ -1,4 +1,4 @@
-import type { TireMeasurement, Vehicle } from "@/lib/types";
+import type { TipoManutencao, TireMeasurement, Vehicle } from "@/lib/types";
 
 /** A partir de quanto do intervalo o aviso "em breve" aparece. */
 export const AVISO_PERCENTUAL = 0.9;
@@ -69,3 +69,19 @@ export const km = (n: number) => `${n.toLocaleString("pt-BR")} km`;
 
 export const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+
+export const TIPOS_MANUTENCAO: Record<TipoManutencao, string> = {
+  oleo: "Troca de óleo",
+  revisao: "Revisão",
+  pneus: "Pneus",
+  freios: "Freios",
+  bateria: "Bateria",
+  outro: "Outro serviço",
+};
+
+export const dinheiro = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** "2026-03-10" -> "10/03/2026" (datas sem horário, sem conversão de fuso) */
+export const data = (iso: string) => iso.split("-").reverse().join("/");
+
+export const hojeISO = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });

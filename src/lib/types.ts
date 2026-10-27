@@ -19,6 +19,8 @@ export type Vehicle = {
   intervalo_revisao: number;
   km_ultima_troca_oleo: number;
   km_ultima_revisao: number;
+  data_ultima_troca_oleo: string | null;
+  data_ultima_revisao: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -37,12 +39,16 @@ export type Trip = {
   status: "em_andamento" | "finalizada";
 };
 
+export type TipoManutencao = "oleo" | "revisao" | "pneus" | "freios" | "bateria" | "outro";
+
 export type Maintenance = {
   id: string;
   vehicle_id: string;
-  tipo: "oleo" | "revisao";
+  tipo: TipoManutencao;
   km: number;
+  custo: number | null;
   observacao: string;
+  user_id: string | null;
   realizada_em: string;
   created_at: string;
 };

@@ -1,61 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Save, Trash2, Wrench } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Vehicle } from "@/lib/types";
-
-export function FormManutencao({ veiculoId, kmAtual }: { veiculoId: string; kmAtual: number }) {
-  const router = useRouter();
-  const [tipo, setTipo] = useState<"oleo" | "revisao">("oleo");
-  const [kmTexto, setKmTexto] = useState(String(kmAtual));
-  const [data, setData] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }));
-  const [obs, setObs] = useState("");
-  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
-  const [salvando, setSalvando] = useState(false);
-
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault();
-    setSalvando(true);
-    const { error } = await createClient()
-      .from("maintenances")
-      .insert({ vehicle_id: veiculoId, tipo, km: Number(kmTexto.replace(/\D/g, "")), realizada_em: data, observacao: obs });
-    setSalvando(false);
-    if (error) return setMsg({ ok: false, texto: error.message });
-    setMsg({ ok: true, texto: "Manutenção registrada. O contador foi zerado." });
-    setObs("");
-    router.refresh();
-  }
-
-  return (
-    <form onSubmit={salvar} className="space-y-3">
-      <div>
-        <label className="rotulo" htmlFor="tipo-manut">Serviço</label>
-        <select id="tipo-manut" className="campo" value={tipo} onChange={(e) => setTipo(e.target.value as "oleo" | "revisao")}>
-          <option value="oleo">Troca de óleo</option>
-          <option value="revisao">Revisão</option>
-        </select>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="rotulo" htmlFor="km-manut">Km</label>
-          <input id="km-manut" className="campo text-right tabular-nums" inputMode="numeric" value={kmTexto} onChange={(e) => setKmTexto(e.target.value)} required />
-        </div>
-        <div>
-          <label className="rotulo" htmlFor="data-manut">Data</label>
-          <input id="data-manut" className="campo" type="date" value={data} onChange={(e) => setData(e.target.value)} required />
-        </div>
-      </div>
-      <div>
-        <label className="rotulo" htmlFor="obs-manut">Observação</label>
-        <input id="obs-manut" className="campo" placeholder="Opcional" value={obs} onChange={(e) => setObs(e.target.value)} />
-      </div>
-      {msg && <p className={msg.ok ? "sucesso" : "erro"}>{msg.texto}</p>}
-      <button className="botao w-full" disabled={salvando}><Wrench size={15} /> Registrar manutenção</button>
-    </form>
-  );
-}
 
 export function FormConfigVeiculo({ veiculo }: { veiculo: Vehicle }) {
   const router = useRouter();

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, ClipboardList, Flag, Gauge, PlusSquare, Route } from "lucide-react";
+import { ChevronRight, ClipboardList, Flag, Gauge, PlusSquare, Route, Wrench } from "lucide-react";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { dataHora, formatarPlaca, km } from "@/lib/regras";
@@ -22,6 +22,7 @@ export default async function Inicio() {
 
   const acoes = [
     { href: "/viagens/nova", icone: Gauge, titulo: "Iniciar viagem", texto: "Registrar saída com foto do odômetro" },
+    { href: "/veiculos", icone: Wrench, titulo: "Manutenção", texto: "Registrar serviço e ver histórico do veículo" },
     { href: "/pneus/novo", icone: ClipboardList, titulo: "Medição de pneus", texto: "Profundidade do sulco (TWI) dos 4 pneus" },
     { href: "/veiculos/novo", icone: PlusSquare, titulo: "Cadastrar veículo", texto: "Placa, modelo e quilometragem inicial" },
   ];

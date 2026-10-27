@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarFront, ClipboardList, Gauge, LayoutList, PlusSquare, Users } from "lucide-react";
+import { CarFront, ClipboardList, Gauge, LayoutList, PlusSquare, Users, Wrench } from "lucide-react";
 
 const ABAS_COMUNS = [
   { href: "/", rotulo: "Início", icone: LayoutList, exato: true },
   { href: "/viagens/nova", rotulo: "Iniciar viagem", icone: Gauge },
+  { href: "/veiculos", rotulo: "Veículos e manutenção", icone: Wrench },
   { href: "/pneus/novo", rotulo: "Medição de pneus", icone: ClipboardList },
   { href: "/veiculos/novo", rotulo: "Cadastrar veículo", icone: PlusSquare },
 ];
@@ -18,10 +19,11 @@ const ABAS_ADMIN = [
 
 export function Abas({ admin }: { admin: boolean }) {
   const caminho = usePathname();
-  const ativa = (href: string, exato?: boolean) =>
-    exato || href === "/admin"
-      ? caminho === href || (href === "/admin" && caminho.startsWith("/admin/veiculos"))
-      : caminho.startsWith(href);
+  const ativa = (href: string, exato?: boolean) => {
+    if (href === "/admin") return caminho === "/admin" || caminho.startsWith("/admin/veiculos");
+    if (href === "/veiculos") return caminho === "/veiculos" || (caminho.startsWith("/veiculos/") && caminho !== "/veiculos/novo");
+    return exato ? caminho === href : caminho.startsWith(href);
+  };
 
   const item = (a: { href: string; rotulo: string; icone: typeof Gauge; exato?: boolean }) => {
     const on = ativa(a.href, a.exato);
