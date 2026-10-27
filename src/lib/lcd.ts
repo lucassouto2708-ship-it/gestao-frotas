@@ -339,26 +339,32 @@ function lerLinha(mask: Uint8Array, w: number, h: number): string | null {
     for (let y = topo; y <= base; y++)
       for (let x = c.x0; x <= c.x1; x++)
         if (limpa[y * w + x]) { tinta++; if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
-    return tinta > H * 0.5 && yMax - yMin + 1 >= H * 0.55;
+    return tinta > H * 0.5 && yMax - yMin + 1 >= H * 0.75;
   });
-  if (!digitos.length || digitos.length > 6) return null;
+  if (!digitos.length || digitos.length > 9) return null;
   const larguraTipica = Math.max(...digitos.map((d) => d.x1 - d.x0 + 1));
   if (larguraTipica > H * 0.9) return null; // dígitos grudados
   // Todo dígito tem segmento à direita (b ou c): células de largura fixa, alinhadas pela direita
   const celula = Math.max(larguraTipica, Math.round(H * 0.4));
 
-  let texto = "";
-  for (let i = 0; i < digitos.length; i++) {
-    const d = digitos[i];
+  // Decodifica cada grupo; grupos não reconhecidos só são tolerados nas pontas (ex.: "km", "ODO")
+  const lidos = digitos.map((d) => {
     const dw = d.x1 - d.x0 + 1;
-    const c =
-      dw < celula * 0.5 && dw < H * 0.3
-        ? "1"
-        : decodificarDigito(limpa, w, { x0: Math.max(0, Math.min(d.x0, d.x1 - celula + 1)), x1: d.x1, y0: topo, y1: base });
-    if (c === null) return null;
-    texto += c;
+    return dw < celula * 0.5 && dw < H * 0.3
+      ? "1"
+      : decodificarDigito(limpa, w, { x0: Math.max(0, Math.min(d.x0, d.x1 - celula + 1)), x1: d.x1, y0: topo, y1: base });
+  });
+  let ini = 0, fim = lidos.length - 1;
+  while (ini <= fim && lidos[ini] === null) ini++;
+  while (fim >= ini && lidos[fim] === null) fim--;
+  if (ini > fim || lidos.slice(ini, fim + 1).includes(null)) return null;
+
+  let texto = "";
+  for (let i = ini; i <= fim; i++) {
+    const d = digitos[i];
+    texto += lidos[i];
     // Ponto decimal: tinta só na parte de baixo, no vão entre este dígito e o próximo
-    const prox = digitos[i + 1];
+    const prox = i < fim ? digitos[i + 1] : undefined;
     if (prox && !texto.includes(".")) {
       let pontos = 0;
       for (let y = base - Math.round(H * 0.18); y <= base + Math.round(H * 0.05) && y < h; y++)
@@ -442,6 +448,117 @@ export function lerLcd(img: Imagem, aceitar: (texto: string) => boolean = () => 
       for (const par of votos) if (!melhor || par[1] > melhor[1]) melhor = par;
     }
     if (melhor && melhor[1] >= 2) return melhor[0];
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Leitura de uma área marcada pelo usuário
+// ---------------------------------------------------------------------------
+
+/** Retângulo em pixels da imagem original. */
+export type Area = { x: number; y: number; w: number; h: number };
+
+/** Sugere onde está a tela do medidor (para posicionar o retângulo de marcação). */
+export function sugerirArea(img: Imagem, aceitar: (texto: string) => boolean = () => true): Area | null {
+  const trabalho = redimensionar(img, 600);
+  const fator = img.width / trabalho.width;
+  // Só sugere uma região onde o leitor realmente encontra um número plausível
+  let escolhido: Visor | null = null, maxVotos = 0;
+  for (const c of localizarVisores(trabalho)) {
+    const votos = lerVisor(img, c, fator).filter(aceitar).length;
+    if (votos > maxVotos) { maxVotos = votos; escolhido = c; }
+  }
+  const v = escolhido && refinar(img, escolhido, fator);
+  if (!v) return null;
+  const cos = Math.cos(v.angulo), sin = Math.sin(v.angulo);
+  const xs: number[] = [], ys: number[] = [];
+  for (const [u, t] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    xs.push((v.cx + (u * v.largura * cos) / 2 - (t * v.altura * sin) / 2) * fator);
+    ys.push((v.cy + (u * v.largura * sin) / 2 + (t * v.altura * cos) / 2) * fator);
+  }
+  const x0 = Math.max(0, Math.min(...xs)), y0 = Math.max(0, Math.min(...ys));
+  const x1 = Math.min(img.width, Math.max(...xs)), y1 = Math.min(img.height, Math.max(...ys));
+  return x1 - x0 > 10 && y1 - y0 > 10 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
+/**
+ * Recorta a área (girada de `angulo`), em tons de cinza com dígitos escuros sobre fundo claro
+ * (inverte visores de fundo escuro) e com uma margem de fundo em volta.
+ */
+function recorteNormalizado(img: Imagem, area: Area, angulo: number) {
+  const alvo = 120;
+  const v = { cx: area.x + area.w / 2, cy: area.y + area.h / 2, angulo, largura: area.w, altura: area.h };
+  const { g, w, h } = recortar(img, v, 1, alvo);
+  // Polaridade: os dígitos são a minoria dos pixels
+  const t = otsu(g);
+  let escuros = 0;
+  for (let i = 0; i < g.length; i++) if (g[i] <= t) escuros++;
+  if (escuros > g.length / 2) for (let i = 0; i < g.length; i++) g[i] = 255 - g[i];
+  const ord = Array.from(g).sort((a, b) => a - b);
+  const fundo = ord[Math.floor(ord.length * 0.75)];
+  const m = Math.round(h * 0.15);
+  const W = w + 2 * m, H = h + 2 * m;
+  const out = new Float32Array(W * H).fill(fundo);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[(y + m) * W + x + m] = g[y * w + x];
+  return { g: out, w: W, h: H, m };
+}
+
+/** Remove o que encosta na borda da área marcada (moldura, pedaços de outros números). */
+function limparBordaDaArea(mask: Uint8Array, W: number, H: number, m: number) {
+  const pilha: number[] = [];
+  const semear = (i: number) => {
+    if (mask[i]) { mask[i] = 0; pilha.push(i); }
+  };
+  for (let x = m; x < W - m; x++) { semear(m * W + x); semear((H - m - 1) * W + x); }
+  for (let y = m; y < H - m; y++) { semear(y * W + m); semear(y * W + W - m - 1); }
+  while (pilha.length) {
+    const j = pilha.pop()!;
+    const x = j % W, y = (j - x) / W;
+    if (x > 0) semear(j - 1);
+    if (x < W - 1) semear(j + 1);
+    if (y > 0) semear(j - W);
+    if (y < H - 1) semear(j + W);
+  }
+  return mask;
+}
+
+/**
+ * Lê os dígitos de 7 segmentos dentro de uma área marcada. Tenta pequenas correções de
+ * inclinação e várias calibrações; vence a leitura aceita mais votada (mínimo 2 votos).
+ */
+export function lerArea(img: Imagem, area: Area, aceitar: (texto: string) => boolean = () => true): string | null {
+  const votos = new Map<string, number>();
+  const etapas = [[0, -0.06, 0.06], [-0.12, 0.12], [-0.18, 0.18], [-0.25, 0.25]];
+  for (const angulos of etapas) {
+    for (const angulo of angulos) {
+      const { g, w, h, m } = recorteNormalizado(img, area, angulo);
+      const janela = Math.round(h * 0.6);
+      // Marcação justa: dígitos podem encostar na borda. Folgada: a moldura encosta.
+      // Lê das duas formas e soma os votos.
+      for (const limpar of [false, true]) {
+        const prep = (k: number) => {
+          const b = binarizar(g, w, h, janela, k);
+          return limpar ? limparBordaDaArea(b, w, h, m) : b;
+        };
+        const t = melhorCisalhamento(prep(0.2), w, h);
+        for (const k of [0.1, 0.16, 0.22, 0.3]) {
+          const c = cisalhar(prep(k), w, h, t);
+          const texto = lerLinha(c.mask, c.w, h);
+          if (texto && aceitar(texto)) votos.set(texto, (votos.get(texto) ?? 0) + 1);
+        }
+      }
+      // Marcação pegando a tela inteira (com moldura): o leitor de visor ajusta o
+      // recorte ao "vidro" claro da tela antes de ler
+      for (const texto of lerVisor(img, { cx: area.x + area.w / 2, cy: area.y + area.h / 2, angulo, largura: area.w, altura: area.h }, 1))
+        if (aceitar(texto)) votos.set(texto, (votos.get(texto) ?? 0) + 1);
+    }
+    // Leituras com pelo menos 2 votos; uma leitura que é pedaço de outra (ex.: "678" de "125678") perde
+    const fortes = [...votos.entries()].filter(([, n]) => n >= 2);
+    const digitos = (t: string) => t.replace(".", "");
+    const completas = fortes.filter(([t]) => !fortes.some(([o]) => digitos(o).length > digitos(t).length && digitos(o).includes(digitos(t))));
+    const melhor = completas.sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0];
+    if (melhor) return melhor[0];
   }
   return null;
 }

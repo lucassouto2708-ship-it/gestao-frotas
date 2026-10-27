@@ -87,7 +87,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
                           const nivel = nivelPneu(mm);
                           return (
                             <td key={p.campo} className={`num ${nivel === "critico" ? "font-semibold text-perigo" : nivel === "atencao" ? "text-alerta" : ""}`}>
-                              {mm.toLocaleString("pt-BR", { minimumFractionDigits: 1 })} mm
+                              {mm.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} mm
                               <Foto caminho={m[p.foto] as string | null} rotulo={`foto ${p.rotulo.toLowerCase()}`} />
                             </td>
                           );

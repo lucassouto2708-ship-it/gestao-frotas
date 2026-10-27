@@ -6,7 +6,7 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 - **Viagens**: o motorista tira foto do mostrador na saída e na chegada. O app calcula os km rodados.
 - **Manutenção**: aviso de troca de óleo (padrão a cada **10.000 km**) e revisão (padrão a cada **20.000 km**), com alerta ao atingir 90% do intervalo. No cadastro do carro dá para informar a última troca de óleo e a última revisão. Depois, qualquer usuário registra serviços (óleo, revisão, pneus, freios, bateria, outros) com km, data e custo, e cada carro tem seu **histórico de manutenção**. Troca de óleo e revisão zeram o contador. Só o ADM exclui registros. Os intervalos podem ser alterados por carro.
 - **Pneus (TWI)**: medição do sulco dos 4 pneus (dianteiro/traseiro, esquerdo/direito) com foto do medidor. Abaixo de 1,6 mm (TWI, mínimo legal) aparece "Trocar"; abaixo de 3 mm, "Atenção".
-- **Leitura automática das fotos (OCR)**: o [Tesseract.js](https://github.com/naptha/tesseract.js) roda no próprio navegador, de graça e sem chave de API. Ele lê o número da foto e preenche o campo. O usuário sempre confere e pode corrigir.
+- **Leitura das fotos com marcação**: depois de tirar a foto, o usuário marca com um retângulo onde estão os números (no medidor de pneu o app já sugere a área sozinho). O app lê só aquele trecho: primeiro com um leitor próprio de visores de 7 segmentos (medidor de sulco e odômetros digitais, de fundo claro ou escuro) e, se não conseguir, com o [Tesseract.js](https://github.com/naptha/tesseract.js). Tudo roda no próprio celular, de graça e sem chave de API. O valor é sempre conferido pelo usuário antes de salvar. O sulco do pneu é guardado com 2 casas decimais (ex.: 1,27 mm).
 
 ## Tipos de usuário
 

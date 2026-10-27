@@ -251,16 +251,23 @@ create table if not exists public.tire_measurements (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles (id) on delete cascade,
   user_id uuid not null references public.profiles (id) default auth.uid(),
-  dianteiro_esquerdo numeric(4, 1) not null check (dianteiro_esquerdo between 0 and 20),
-  dianteiro_direito numeric(4, 1) not null check (dianteiro_direito between 0 and 20),
-  traseiro_esquerdo numeric(4, 1) not null check (traseiro_esquerdo between 0 and 20),
-  traseiro_direito numeric(4, 1) not null check (traseiro_direito between 0 and 20),
+  dianteiro_esquerdo numeric(4, 2) not null check (dianteiro_esquerdo between 0 and 20),
+  dianteiro_direito numeric(4, 2) not null check (dianteiro_direito between 0 and 20),
+  traseiro_esquerdo numeric(4, 2) not null check (traseiro_esquerdo between 0 and 20),
+  traseiro_direito numeric(4, 2) not null check (traseiro_direito between 0 and 20),
   foto_de text,
   foto_dd text,
   foto_te text,
   foto_td text,
   created_at timestamptz not null default now()
 );
+
+-- Atualização: o medidor digital mostra 2 casas decimais (ex.: 1,27 mm)
+alter table public.tire_measurements
+  alter column dianteiro_esquerdo type numeric(4, 2),
+  alter column dianteiro_direito type numeric(4, 2),
+  alter column traseiro_esquerdo type numeric(4, 2),
+  alter column traseiro_direito type numeric(4, 2);
 
 
 -- ---------------------------------------------------------------------
