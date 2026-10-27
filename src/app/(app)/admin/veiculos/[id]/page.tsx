@@ -8,8 +8,9 @@ import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
 import { PNEUS, dataHora, formatarPlaca, km, nivelPneu } from "@/lib/regras";
 import { requireAdmin } from "@/lib/supabase/server";
-import type { Profile, TireMeasurement, Trip, Vehicle } from "@/lib/types";
+import type { Profile, TireMeasurement, Trip, Vehicle, VehicleUser } from "@/lib/types";
 import { FormConfigVeiculo } from "./Formularios";
+import { Motoristas, type Vinculado } from "./Motoristas";
 
 type ComUsuario<T> = T & { profiles: Pick<Profile, "nome" | "email"> | null };
 
@@ -17,13 +18,23 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
   const { id } = await params;
   const { supabase } = await requireAdmin();
 
-  const [{ data: v }, { data: viagens }, { data: manutencoes }, { data: medicoes }] = await Promise.all([
+  const [{ data: v }, { data: viagens }, { data: manutencoes }, { data: medicoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
     supabase.from("trips").select("*, profiles(nome, email)").eq("vehicle_id", id).order("iniciada_em", { ascending: false }).limit(50),
     supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
     supabase.from("tire_measurements").select("*, profiles(nome, email)").eq("vehicle_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("vehicle_users").select("*").eq("vehicle_id", id).order("vinculado_em"),
+    supabase.from("profiles").select("id, nome, email, role").order("nome"),
   ]);
   if (!v) notFound();
+  const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role">[];
+  const nomeDe = new Map(listaPerfis.map((p) => [p.id, p.nome || p.email || "—"]));
+  const vinculados: Vinculado[] = ((vinculos ?? []) as VehicleUser[]).map((l) => ({
+    id: l.user_id,
+    nome: nomeDe.get(l.user_id) ?? "—",
+    vinculadoPor: l.vinculado_por ? nomeDe.get(l.vinculado_por) ?? "—" : null,
+    vinculadoEm: l.vinculado_em,
+  }));
   const listaViagens = (viagens ?? []) as ComUsuario<Trip>[];
   const listaMedicoes = (medicoes ?? []) as ComUsuario<TireMeasurement>[];
   const fotos = await linksDasFotos(supabase, [
@@ -43,7 +54,9 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
   return (
     <Pagina
       titulo={`Veículo ${formatarPlaca(v.placa)}`}
-      descricao={`${v.modelo || "Modelo não informado"} · cadastrado em ${dataHora(v.created_at)}`}
+      descricao={`${v.modelo || "Modelo não informado"} · cadastrado em ${dataHora(v.created_at)}${v.created_by ? ` por ${nomeDe.get(v.created_by) ?? "—"}` : ""}${
+        v.atualizado_por && v.atualizado_em ? ` · última alteração por ${nomeDe.get(v.atualizado_por) ?? "—"} em ${dataHora(v.atualizado_em)}` : ""
+      }`}
       voltar="/admin"
     >
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
@@ -140,6 +153,18 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
         </div>
 
         <div className="space-y-4 self-start">
+          <Painel
+            titulo="Motoristas vinculados"
+            acoes={<span className="text-xs text-texto-2">Só eles usam este carro</span>}
+            semPadding
+          >
+            <Motoristas
+              veiculoId={v.id}
+              vinculados={vinculados}
+              usuarios={listaPerfis.filter((p) => p.role !== "admin").map((p) => ({ id: p.id, nome: nomeDe.get(p.id)! }))}
+            />
+          </Painel>
+
           <Painel titulo="Registrar manutenção">
             <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
           </Painel>

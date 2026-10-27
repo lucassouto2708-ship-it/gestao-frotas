@@ -17,7 +17,7 @@ const textoNivel = { ok: "OK", atencao: "Atenção", critico: "Trocar" } as cons
 
 export function FormPneus({ veiculos }: { veiculos: Vehicle[] }) {
   const router = useRouter();
-  const [veiculoId, setVeiculoId] = useState("");
+  const [veiculoId, setVeiculoId] = useState(veiculos.length === 1 ? veiculos[0].id : "");
   const [valores, setValores] = useState<Record<Campo, string>>({
     dianteiro_esquerdo: "",
     dianteiro_direito: "",

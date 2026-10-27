@@ -23,7 +23,8 @@ export default async function Veiculos() {
         {veiculos.length === 0 ? (
           <EstadoVazio
             icone={<CarFront size={28} strokeWidth={1.5} />}
-            titulo="Nenhum veículo cadastrado"
+            titulo="Nenhum veículo vinculado a você"
+            texto="Você só vê os veículos vinculados ao seu usuário. Peça ao administrador para vincular o seu carro, ou cadastre um veículo novo."
             acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
           />
         ) : (

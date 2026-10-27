@@ -60,7 +60,9 @@ export default function NovoVeiculo() {
         })
         .select("id")
         .single();
-      if (error) throw new Error(error.code === "23505" ? "Essa placa já está cadastrada." : error.message);
+      if (error) throw new Error(error.code === "23505"
+              ? "Essa placa já está cadastrada. Se o carro é seu, peça ao administrador para vinculá-lo ao seu usuário."
+              : error.message);
       router.push(`/veiculos/${criado.id}`);
       router.refresh();
     } catch (err) {

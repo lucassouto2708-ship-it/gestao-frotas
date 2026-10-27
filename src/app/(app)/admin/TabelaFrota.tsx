@@ -18,6 +18,7 @@ export type LinhaFrota = {
   oleo: StatusManutencao;
   revisao: StatusManutencao;
   pneus: Nivel | null;
+  motoristas: string[];
 };
 
 const textoManut: Record<Nivel, string> = { ok: "Em dia", atencao: "Em breve", critico: "Vencida" };
@@ -67,7 +68,10 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
     const lista = linhas.filter(
       (l) =>
         FILTROS[filtro].f(l) &&
-        (!termo || l.placa.toLowerCase().replace(/-/g, "").includes(termo) || l.modelo.toLowerCase().includes(termo)),
+        (!termo ||
+          l.placa.toLowerCase().replace(/-/g, "").includes(termo) ||
+          l.modelo.toLowerCase().includes(termo) ||
+          l.motoristas.some((m) => m.toLowerCase().includes(termo))),
     );
     const v = valorOrdem[ordem.col];
     return lista.sort((a, b) => {
@@ -83,10 +87,11 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
   }
 
   function exportarCsv() {
-    const cab = ["Placa", "Modelo", "Km atual", "Km na competência", "Viagens", "Óleo", "Óleo (km restantes)", "Revisão", "Revisão (km restantes)", "Pneus", "Em viagem"];
+    const cab = ["Placa", "Modelo", "Motoristas", "Km atual", "Km na competência", "Viagens", "Óleo", "Óleo (km restantes)", "Revisão", "Revisão (km restantes)", "Pneus", "Em viagem"];
     const linhasCsv = visiveis.map((l) => [
       l.placa,
       l.modelo,
+      l.motoristas.join(", "),
       l.kmAtual,
       l.kmMes,
       l.viagensMes,
@@ -130,7 +135,7 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
           <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-texto-2" />
           <input
             className="campo pl-8"
-            placeholder="Pesquisar placa ou modelo"
+            placeholder="Pesquisar placa, modelo ou motorista"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             aria-label="Pesquisar"
@@ -170,6 +175,7 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
                 <Th col="oleo">Troca de óleo</Th>
                 <Th col="revisao">Revisão</Th>
                 <Th col="pneus">Pneus</Th>
+                <th>Motoristas</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -195,6 +201,9 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
                       </td>
                     ))}
                     <td>{l.pneus ? <Selo nivel={l.pneus}>{textoPneu[l.pneus]}</Selo> : <Selo nivel="neutro">Sem medição</Selo>}</td>
+                    <td className="max-w-48 text-xs">
+                      {l.motoristas.length ? l.motoristas.join(", ") : <span className="text-alerta">Nenhum vinculado</span>}
+                    </td>
                     <td className="whitespace-nowrap">
                       {l.emViagem ? <Selo nivel="info">Em viagem</Selo> : <Selo nivel="neutro">Disponível</Selo>}
                     </td>

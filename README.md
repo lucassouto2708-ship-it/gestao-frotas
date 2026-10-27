@@ -12,14 +12,15 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 
 | | Comum | ADM |
 |---|---|---|
-| Cadastrar carro (com última troca de óleo/revisão) | ✅ | ✅ |
+| Ver e usar só os carros vinculados a ele (o ADM vincula na ficha do veículo) | ✅ | todos |
+| Cadastrar carro (fica vinculado a quem cadastrou; com última troca de óleo/revisão) | ✅ | ✅ |
 | Registrar manutenção e ver histórico do carro | ✅ | ✅ |
 | Excluir registro de manutenção | ❌ | ✅ |
 | Iniciar/finalizar viagem com fotos | ✅ (só as próprias) | ✅ |
 | Medir pneus | ✅ (só as próprias) | ✅ |
 | Painel com todos os carros, km do mês, alertas | ❌ | ✅ |
 | Ver fotos e histórico de todos | ❌ | ✅ |
-| Alterar intervalos, excluir carro | ❌ | ✅ |
+| Alterar intervalos, excluir carro, vincular/desvincular motoristas | ❌ | ✅ |
 | Promover usuários a ADM | ❌ | ✅ |
 
 As permissões são garantidas no próprio banco (Row Level Security do Supabase), não só na tela.

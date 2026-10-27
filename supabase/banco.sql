@@ -226,6 +226,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
+  -- Quem cadastra o carro fica vinculado a ele
+  if new.created_by is not null and to_regclass('public.vehicle_users') is not null then
+    insert into public.vehicle_users (vehicle_id, user_id, vinculado_por)
+    values (new.id, new.created_by, new.created_by)
+    on conflict do nothing;
+  end if;
   if new.data_ultima_troca_oleo is not null then
     insert into public.maintenances (vehicle_id, tipo, km, realizada_em, observacao, user_id)
     values (new.id, 'oleo', new.km_ultima_troca_oleo, new.data_ultima_troca_oleo, 'Informado no cadastro do veículo', new.created_by);
@@ -271,6 +277,85 @@ alter table public.tire_measurements
 
 
 -- ---------------------------------------------------------------------
+-- 5b. VÍNCULO VEÍCULO x USUÁRIO (quem pode usar cada carro)
+-- ---------------------------------------------------------------------
+-- Na primeira vez: cria a tabela e vincula cada carro a quem o cadastrou e a
+-- quem já registrou viagem, medição ou manutenção nele.
+do $$
+begin
+  if to_regclass('public.vehicle_users') is null then
+    create table public.vehicle_users (
+      vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+      user_id uuid not null references public.profiles (id) on delete cascade,
+      vinculado_por uuid references public.profiles (id) default auth.uid(),
+      vinculado_em timestamptz not null default now(),
+      primary key (vehicle_id, user_id)
+    );
+    insert into public.vehicle_users (vehicle_id, user_id, vinculado_por)
+    select distinct vehicle_id, user_id, null::uuid from (
+      select id as vehicle_id, created_by as user_id from public.vehicles
+      union select vehicle_id, user_id from public.trips
+      union select vehicle_id, user_id from public.tire_measurements
+      union select vehicle_id, user_id from public.maintenances
+    ) t
+    where user_id is not null
+    on conflict do nothing;
+  end if;
+end $$;
+
+create index if not exists vehicle_users_user_idx on public.vehicle_users (user_id);
+
+-- O usuário logado pode usar este carro? (ADM pode todos)
+create or replace function public.pode_usar_veiculo(vid uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select public.is_admin()
+      or exists (select 1 from public.vehicle_users where vehicle_id = vid and user_id = auth.uid());
+$$;
+
+-- O usuário logado divide algum carro com esta pessoa? (para ver o nome dela nos históricos)
+create or replace function public.compartilha_veiculo(uid uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.vehicle_users a
+    join public.vehicle_users b on b.vehicle_id = a.vehicle_id
+    where a.user_id = auth.uid() and b.user_id = uid
+  );
+$$;
+
+-- Quem fez a última alteração no cadastro do carro (alterações diretas, não as automáticas de km)
+alter table public.vehicles add column if not exists atualizado_por uuid references public.profiles (id);
+alter table public.vehicles add column if not exists atualizado_em timestamptz;
+
+create or replace function public.vehicles_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  if pg_trigger_depth() = 1 and auth.uid() is not null
+     and (new.placa, new.modelo, new.intervalo_oleo, new.intervalo_revisao, new.km_atual)
+         is distinct from (old.placa, old.modelo, old.intervalo_oleo, old.intervalo_revisao, old.km_atual) then
+    new.atualizado_por := auth.uid();
+    new.atualizado_em := now();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists vehicles_before_update on public.vehicles;
+create trigger vehicles_before_update
+  before update on public.vehicles
+  for each row execute function public.vehicles_before_update();
+
+
+-- ---------------------------------------------------------------------
 -- 6. PERMISSÕES (quem pode ver e alterar o quê)
 -- ---------------------------------------------------------------------
 alter table public.profiles enable row level security;
@@ -278,19 +363,21 @@ alter table public.vehicles enable row level security;
 alter table public.trips enable row level security;
 alter table public.maintenances enable row level security;
 alter table public.tire_measurements enable row level security;
+alter table public.vehicle_users enable row level security;
 
--- Usuários: cada um vê o seu; ADM vê e altera todos
+-- Usuários: cada um vê o seu e os de quem divide carro com ele; ADM vê e altera todos
 drop policy if exists "perfil proprio ou admin" on public.profiles;
 create policy "perfil proprio ou admin" on public.profiles
-  for select using (id = auth.uid() or public.is_admin());
+  for select using (id = auth.uid() or public.is_admin() or public.compartilha_veiculo(id));
 drop policy if exists "admin altera perfis" on public.profiles;
 create policy "admin altera perfis" on public.profiles
   for update using (public.is_admin());
 
--- Carros: todos os logados listam e cadastram; só ADM altera ou exclui
+-- Carros: cada usuário vê os carros vinculados a ele (ADM vê todos); todos cadastram;
+-- só ADM altera ou exclui
 drop policy if exists "logado lista veiculos" on public.vehicles;
 create policy "logado lista veiculos" on public.vehicles
-  for select to authenticated using (true);
+  for select to authenticated using (public.pode_usar_veiculo(id) or created_by = auth.uid());
 drop policy if exists "logado cadastra veiculo" on public.vehicles;
 create policy "logado cadastra veiculo" on public.vehicles
   for insert to authenticated with check (created_by = auth.uid());
@@ -307,7 +394,7 @@ create policy "viagens proprias ou admin" on public.trips
   for select using (user_id = auth.uid() or public.is_admin());
 drop policy if exists "inicia viagem propria" on public.trips;
 create policy "inicia viagem propria" on public.trips
-  for insert to authenticated with check (user_id = auth.uid() and status = 'em_andamento');
+  for insert to authenticated with check (user_id = auth.uid() and status = 'em_andamento' and public.pode_usar_veiculo(vehicle_id));
 drop policy if exists "finaliza viagem propria" on public.trips;
 create policy "finaliza viagem propria" on public.trips
   for update using ((user_id = auth.uid() and status = 'em_andamento') or public.is_admin())
@@ -319,14 +406,14 @@ create policy "admin exclui viagem" on public.trips
 revoke update on public.trips from authenticated;
 grant update (km_fim, foto_fim, finalizada_em, status) on public.trips to authenticated;
 
--- Manutenções: todos veem e registram; só ADM exclui
+-- Manutenções: quem usa o carro vê e registra; só ADM exclui
 drop policy if exists "logado ve manutencoes" on public.maintenances;
 create policy "logado ve manutencoes" on public.maintenances
-  for select to authenticated using (true);
+  for select to authenticated using (public.pode_usar_veiculo(vehicle_id));
 drop policy if exists "admin registra manutencao" on public.maintenances;
 drop policy if exists "logado registra manutencao" on public.maintenances;
 create policy "logado registra manutencao" on public.maintenances
-  for insert to authenticated with check (user_id = auth.uid());
+  for insert to authenticated with check (user_id = auth.uid() and public.pode_usar_veiculo(vehicle_id));
 drop policy if exists "admin exclui manutencao" on public.maintenances;
 create policy "admin exclui manutencao" on public.maintenances
   for delete using (public.is_admin());
@@ -337,7 +424,18 @@ create policy "medicoes proprias ou admin" on public.tire_measurements
   for select using (user_id = auth.uid() or public.is_admin());
 drop policy if exists "registra medicao propria" on public.tire_measurements;
 create policy "registra medicao propria" on public.tire_measurements
-  for insert to authenticated with check (user_id = auth.uid());
+  for insert to authenticated with check (user_id = auth.uid() and public.pode_usar_veiculo(vehicle_id));
+
+-- Vínculos: cada um vê os vínculos dos carros que usa; só ADM vincula/desvincula
+drop policy if exists "ve vinculos" on public.vehicle_users;
+create policy "ve vinculos" on public.vehicle_users
+  for select to authenticated using (user_id = auth.uid() or public.pode_usar_veiculo(vehicle_id));
+drop policy if exists "admin vincula" on public.vehicle_users;
+create policy "admin vincula" on public.vehicle_users
+  for insert with check (public.is_admin());
+drop policy if exists "admin desvincula" on public.vehicle_users;
+create policy "admin desvincula" on public.vehicle_users
+  for delete using (public.is_admin());
 
 
 -- ---------------------------------------------------------------------

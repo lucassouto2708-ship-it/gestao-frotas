@@ -17,8 +17,8 @@ export default async function NovaMedicaoPneus() {
         <Painel className="max-w-2xl">
           <EstadoVazio
             icone={<CarFront size={28} strokeWidth={1.5} />}
-            titulo="Nenhum veículo cadastrado"
-            texto="Cadastre um veículo antes de registrar medições."
+            titulo="Nenhum veículo vinculado a você"
+            texto="Peça ao administrador para vincular o seu carro ao seu usuário, ou cadastre um veículo novo, para registrar medições."
             acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
           />
         </Painel>

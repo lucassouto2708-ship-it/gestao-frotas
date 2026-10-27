@@ -23,6 +23,15 @@ export type Vehicle = {
   data_ultima_revisao: string | null;
   created_by: string | null;
   created_at: string;
+  atualizado_por: string | null;
+  atualizado_em: string | null;
+};
+
+export type VehicleUser = {
+  vehicle_id: string;
+  user_id: string;
+  vinculado_por: string | null;
+  vinculado_em: string;
 };
 
 export type Trip = {

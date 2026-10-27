@@ -28,12 +28,20 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
   const mes = mesParam && /^\d{4}-\d{2}$/.test(mesParam) ? mesParam : mesAtual();
   const { inicio, fim } = intervaloDoMes(mes);
 
-  const [{ data: veiculos }, { data: viagensMes }, { data: abertas }, { data: medicoes }] = await Promise.all([
+  const [{ data: veiculos }, { data: viagensMes }, { data: abertas }, { data: medicoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").order("placa"),
     supabase.from("trips").select("vehicle_id, km_inicio, km_fim").eq("status", "finalizada").gte("finalizada_em", inicio).lt("finalizada_em", fim),
     supabase.from("trips").select("vehicle_id").eq("status", "em_andamento"),
     supabase.from("tire_measurements").select("*").order("created_at", { ascending: false }),
+    supabase.from("vehicle_users").select("vehicle_id, user_id"),
+    supabase.from("profiles").select("id, nome, email"),
   ]);
+  const nomeDe = new Map(((perfis ?? []) as { id: string; nome: string; email: string | null }[]).map((p) => [p.id, p.nome || p.email || "—"]));
+  const motoristasDe = (vid: string) =>
+    ((vinculos ?? []) as { vehicle_id: string; user_id: string }[])
+      .filter((l) => l.vehicle_id === vid)
+      .map((l) => nomeDe.get(l.user_id) ?? "—")
+      .sort();
 
   const kmMes = new Map<string, { km: number; viagens: number }>();
   for (const t of (viagensMes ?? []) as Pick<Trip, "vehicle_id" | "km_inicio" | "km_fim">[]) {
@@ -58,6 +66,7 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
       oleo: statusOleo(v),
       revisao: statusRevisao(v),
       pneus: med ? piorNivel(PNEUS.map((p) => nivelPneu(Number(med[p.campo])))) : null,
+      motoristas: motoristasDe(v.id),
     };
   });
   const totalKm = lista.reduce((s, l) => s + l.kmMes, 0);

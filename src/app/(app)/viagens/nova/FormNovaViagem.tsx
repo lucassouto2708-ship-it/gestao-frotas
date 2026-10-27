@@ -12,7 +12,9 @@ import type { Vehicle } from "@/lib/types";
 
 export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso: string[] }) {
   const router = useRouter();
-  const [veiculoId, setVeiculoId] = useState("");
+  // Só um carro disponível para o usuário: já vem selecionado
+  const livres = veiculos.filter((v) => !emUso.includes(v.id));
+  const [veiculoId, setVeiculoId] = useState(livres.length === 1 ? livres[0].id : "");
   const [destino, setDestino] = useState("");
   const [kmTexto, setKmTexto] = useState("");
   const [foto, setFoto] = useState<Blob | null>(null);
