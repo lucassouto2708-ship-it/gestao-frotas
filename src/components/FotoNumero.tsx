@@ -86,12 +86,20 @@ export function FotoNumero({ rotulo, modo, referencia, valor, onValor, onFoto, f
     setAviso(null);
     setLendo(true);
     try {
-      const n = await lerArea(imagem, area, modo, referencia);
-      if (n === null) {
+      const leitura = await lerArea(imagem, area, modo, referencia);
+      if (leitura === null) {
         setAviso({ ok: false, texto: "Não foi possível ler os números. Ajuste a marcação ou digite o valor." });
       } else {
+        const n = leitura.valor;
         onValor(modo === "pneu" ? n.toFixed(2).replace(".", ",") : String(n));
-        setAviso({ ok: true, texto: "Valor lido da área marcada. Confira antes de salvar." });
+        setAviso(
+          leitura.foraDaReferencia && referencia !== undefined
+            ? {
+                ok: false,
+                texto: `Lido ${n.toLocaleString("pt-BR")} km, mas o último km registrado deste carro é ${referencia.toLocaleString("pt-BR")} km. Confira a foto e o valor.`,
+              }
+            : { ok: true, texto: "Valor lido da área marcada. Confira antes de salvar." },
+        );
       }
     } catch {
       setAviso({ ok: false, texto: "A leitura automática falhou. Digite o valor." });

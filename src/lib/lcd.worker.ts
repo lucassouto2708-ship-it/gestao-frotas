@@ -10,7 +10,9 @@ self.onmessage = (e: MessageEvent<Pedido>) => {
   const p = e.data;
   try {
     const resultado =
-      p.tipo === "sugerir" ? sugerirArea(p.img, criterio(p.modo)) : lerArea(p.img, p.area, criterio(p.modo, p.referencia));
+      p.tipo === "sugerir"
+        ? sugerirArea(p.img, criterio(p.modo))
+        : lerArea(p.img, p.area, criterio(p.modo, p.referencia), { odometro: p.modo === "odometro" });
     self.postMessage({ id: p.id, resultado });
   } catch (erro) {
     self.postMessage({ id: p.id, erro: String(erro) });

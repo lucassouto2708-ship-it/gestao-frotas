@@ -31,6 +31,16 @@ const PADROES: Record<string, string> = {
 };
 const SEGMENTOS = "abcdefg";
 
+// Variantes comuns em painéis de carro: "6" sem o traço de cima e "9" sem o de baixo
+const PADROES_ODOMETRO: Record<string, string> = { ...PADROES, cdefg: "6", abcfg: "9" };
+
+/**
+ * Ajustes do modo odômetro (o medidor de pneu usa o comportamento padrão):
+ * aceita as variantes de 6/9, não descarta peças à esquerda como rótulo e
+ * nunca aceita leitura com dígito irreconhecível nas pontas (evita leituras parciais).
+ */
+export type Opcoes = { odometro?: boolean };
+
 function luminancia(d: Uint8ClampedArray, p: number) {
   return 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
 }
@@ -263,7 +273,7 @@ function cisalhar(mask: Uint8Array, w: number, h: number, t: number) {
   return { mask: out, w: nw };
 }
 
-function decodificarDigito(mask: Uint8Array, w: number, cx: Caixa): string | null {
+function decodificarDigito(mask: Uint8Array, w: number, cx: Caixa, opcoes: Opcoes = {}): string | null {
   const dw = cx.x1 - cx.x0 + 1, dh = cx.y1 - cx.y0 + 1;
   const frac = (fx0: number, fx1: number, fy0: number, fy1: number) => {
     const xa = cx.x0 + Math.floor(fx0 * dw), xb = cx.x0 + Math.ceil(fx1 * dw);
@@ -284,10 +294,10 @@ function decodificarDigito(mask: Uint8Array, w: number, cx: Caixa): string | nul
   const max = Math.max(...Object.values(regioes));
   if (max < 0.15) return null;
   const acesos = SEGMENTOS.split("").filter((s) => regioes[s] > Math.max(0.1, max * 0.35)).join("");
-  return PADROES[acesos] ?? null;
+  return (opcoes.odometro ? PADROES_ODOMETRO : PADROES)[acesos] ?? null;
 }
 
-function lerLinha(mask: Uint8Array, w: number, h: number): string | null {
+function lerLinha(mask: Uint8Array, w: number, h: number, opcoes: Opcoes = {}): string | null {
   // Descarta linhas compridas (bordas da moldura) e ruído
   const blobs = componentes(mask, w, h, 6).filter((b) => {
     const bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1;
@@ -308,7 +318,7 @@ function lerLinha(mask: Uint8Array, w: number, h: number): string | null {
   topo = h; base = 0;
   for (const b of blobs) {
     if (b.y0 < Math.min(...altos.map((a) => a.y0)) - H0 * 0.2 || b.y1 > Math.max(...altos.map((a) => a.y1)) + H0 * 0.2) continue;
-    if (b.x1 < xMinAltos) continue; // longe, à esquerda dos dígitos
+    if (!opcoes.odometro && b.x1 < xMinAltos) continue; // longe, à esquerda dos dígitos
     topo = Math.min(topo, b.y0); base = Math.max(base, b.y1);
     for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) if (mask[y * w + x]) limpa[y * w + x] = 1;
   }
@@ -352,8 +362,9 @@ function lerLinha(mask: Uint8Array, w: number, h: number): string | null {
     const dw = d.x1 - d.x0 + 1;
     return dw < celula * 0.5 && dw < H * 0.3
       ? "1"
-      : decodificarDigito(limpa, w, { x0: Math.max(0, Math.min(d.x0, d.x1 - celula + 1)), x1: d.x1, y0: topo, y1: base });
+      : decodificarDigito(limpa, w, { x0: Math.max(0, Math.min(d.x0, d.x1 - celula + 1)), x1: d.x1, y0: topo, y1: base }, opcoes);
   });
+  if (opcoes.odometro && lidos.includes(null)) return null;
   let ini = 0, fim = lidos.length - 1;
   while (ini <= fim && lidos[ini] === null) ini++;
   while (fim >= ini && lidos[fim] === null) fim--;
@@ -413,7 +424,7 @@ function melhorCisalhamento(bin: Uint8Array, w: number, h: number) {
 }
 
 /** Lê um visor com várias calibrações de recorte e limiar; devolve todas as leituras. */
-function lerVisor(img: Imagem, bruto: Visor, fator: number): string[] {
+function lerVisor(img: Imagem, bruto: Visor, fator: number, opcoes: Opcoes = {}): string[] {
   const leituras: string[] = [];
   const v = refinar(img, bruto, fator);
   if (!v || v.largura / v.altura < 1.2) return leituras;
@@ -423,7 +434,7 @@ function lerVisor(img: Imagem, bruto: Visor, fator: number): string[] {
     const t = melhorCisalhamento(limparBordas(binarizar(g, w, h, janela, 0.2), w, h), w, h);
     for (const k of [0.12, 0.2, 0.3]) {
       const c = cisalhar(limparBordas(binarizar(g, w, h, janela, k), w, h), w, h, t);
-      const texto = lerLinha(c.mask, c.w, h);
+      const texto = lerLinha(c.mask, c.w, h, opcoes);
       if (texto) leituras.push(texto);
     }
   }
@@ -527,7 +538,12 @@ function limparBordaDaArea(mask: Uint8Array, W: number, H: number, m: number) {
  * Lê os dígitos de 7 segmentos dentro de uma área marcada. Tenta pequenas correções de
  * inclinação e várias calibrações; vence a leitura aceita mais votada (mínimo 2 votos).
  */
-export function lerArea(img: Imagem, area: Area, aceitar: (texto: string) => boolean = () => true): string | null {
+export function lerArea(
+  img: Imagem,
+  area: Area,
+  aceitar: (texto: string) => boolean = () => true,
+  opcoes: Opcoes = {},
+): string | null {
   const votos = new Map<string, number>();
   const etapas = [[0, -0.06, 0.06], [-0.12, 0.12], [-0.18, 0.18], [-0.25, 0.25]];
   for (const angulos of etapas) {
@@ -544,13 +560,13 @@ export function lerArea(img: Imagem, area: Area, aceitar: (texto: string) => boo
         const t = melhorCisalhamento(prep(0.2), w, h);
         for (const k of [0.1, 0.16, 0.22, 0.3]) {
           const c = cisalhar(prep(k), w, h, t);
-          const texto = lerLinha(c.mask, c.w, h);
+          const texto = lerLinha(c.mask, c.w, h, opcoes);
           if (texto && aceitar(texto)) votos.set(texto, (votos.get(texto) ?? 0) + 1);
         }
       }
       // Marcação pegando a tela inteira (com moldura): o leitor de visor ajusta o
       // recorte ao "vidro" claro da tela antes de ler
-      for (const texto of lerVisor(img, { cx: area.x + area.w / 2, cy: area.y + area.h / 2, angulo, largura: area.w, altura: area.h }, 1))
+      for (const texto of lerVisor(img, { cx: area.x + area.w / 2, cy: area.y + area.h / 2, angulo, largura: area.w, altura: area.h }, 1, opcoes))
         if (aceitar(texto)) votos.set(texto, (votos.get(texto) ?? 0) + 1);
     }
     // Leituras com pelo menos 2 votos; uma leitura que é pedaço de outra (ex.: "678" de "125678") perde

@@ -71,7 +71,7 @@ async function executar<T>(pedido: Pedido): Promise<T> {
   const lcd = await import("./lcd");
   return (pedido.tipo === "sugerir"
     ? lcd.sugerirArea(pedido.img, criterio(pedido.modo))
-    : lcd.lerArea(pedido.img, pedido.area, criterio(pedido.modo, pedido.referencia))) as T;
+    : lcd.lerArea(pedido.img, pedido.area, criterio(pedido.modo, pedido.referencia), { odometro: pedido.modo === "odometro" })) as T;
 }
 
 /** Onde provavelmente está a tela do medidor (para posicionar o retângulo). */
@@ -147,9 +147,22 @@ async function lerComTesseract(img: Imagem, area: Area, modo: ModoLeitura, refer
   return null;
 }
 
-/** Lê o número dentro da área marcada. */
-export async function lerArea(img: Imagem, area: Area, modo: ModoLeitura, referencia?: number): Promise<number | null> {
+export type Leitura = { valor: number; foraDaReferencia: boolean };
+
+async function lerUmaVez(img: Imagem, area: Area, modo: ModoLeitura, referencia?: number): Promise<number | null> {
   const texto = await executar<string | null>({ tipo: "ler", img, area, modo, referencia }).catch(() => null);
   if (texto) return interpretar(texto, modo);
   return lerComTesseract(img, area, modo, referencia).catch(() => null);
+}
+
+/**
+ * Lê o número dentro da área marcada. No odômetro, o km anterior do carro ajuda a escolher a
+ * leitura certa; se nada bate com ele, lê sem essa restrição e avisa (o usuário confere).
+ */
+export async function lerArea(img: Imagem, area: Area, modo: ModoLeitura, referencia?: number): Promise<Leitura | null> {
+  const valor = await lerUmaVez(img, area, modo, referencia);
+  if (valor !== null) return { valor, foraDaReferencia: false };
+  if (modo !== "odometro" || referencia === undefined) return null;
+  const semRef = await lerUmaVez(img, area, modo);
+  return semRef === null ? null : { valor: semRef, foraDaReferencia: true };
 }
