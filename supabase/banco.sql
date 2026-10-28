@@ -83,11 +83,6 @@ create table if not exists public.configuracoes (
   atualizado_por uuid references public.profiles (id),
   atualizado_em timestamptz
 );
--- Limpeza de fotos antigas: por quantos meses guardar e se a limpeza automática está ligada
-alter table public.configuracoes add column if not exists meses_guardar_fotos integer not null default 6;
-alter table public.configuracoes add column if not exists limpeza_fotos_ativa boolean not null default true;
-alter table public.configuracoes drop constraint if exists configuracoes_meses_fotos_check;
-alter table public.configuracoes add constraint configuracoes_meses_fotos_check check (meses_guardar_fotos between 1 and 60);
 insert into public.configuracoes (id) values (true) on conflict do nothing;
 
 create or replace function public.configuracoes_before_update()
@@ -95,11 +90,8 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if (new.intervalo_oleo, new.intervalo_revisao, new.meses_guardar_fotos, new.limpeza_fotos_ativa)
-     is distinct from (old.intervalo_oleo, old.intervalo_revisao, old.meses_guardar_fotos, old.limpeza_fotos_ativa) then
-    new.atualizado_por := auth.uid();
-    new.atualizado_em := now();
-  end if;
+  new.atualizado_por := auth.uid();
+  new.atualizado_em := now();
   return new;
 end;
 $$;
@@ -393,133 +385,6 @@ create trigger vehicles_before_update
 
 
 -- ---------------------------------------------------------------------
--- 5c. LIMPEZA DE FOTOS ANTIGAS (apaga só as fotos; km, mm e histórico ficam)
--- ---------------------------------------------------------------------
--- As fotos das viagens passam a poder ser removidas: o campo deixa de ser obrigatório
-alter table public.trips alter column foto_inicio drop not null;
-do $$
-declare r record;
-begin
-  -- a regra antiga exigia foto_fim em viagem finalizada: troca por uma que não exige foto
-  for r in
-    select conname from pg_constraint
-    where conrelid = 'public.trips'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%foto_fim%'
-  loop
-    execute format('alter table public.trips drop constraint %I', r.conname);
-  end loop;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.trips'::regclass and conname = 'trips_fim_completo') then
-    alter table public.trips add constraint trips_fim_completo
-      check (status = 'em_andamento' or (km_fim is not null and finalizada_em is not null));
-  end if;
-end $$;
-
--- Histórico das limpezas (quem executou; sem usuário = automática)
-create table if not exists public.limpezas_fotos (
-  id uuid primary key default gen_random_uuid(),
-  executada_em timestamptz not null default now(),
-  executada_por uuid references public.profiles (id) on delete set null,
-  automatica boolean not null default false,
-  meses integer not null,
-  quantidade integer not null,
-  bytes bigint not null default 0
-);
-
--- Fotos com mais de N meses (data do envio), exceto as de viagens ainda em andamento.
--- Só o ADM (ou a rotina automática do servidor, que não tem usuário) pode consultar.
-create or replace function public.fotos_para_limpar(meses integer, limite integer default 300)
-returns table (caminho text, tamanho bigint, enviada_em timestamptz)
-language plpgsql
-stable
-security definer set search_path = public, storage
-as $$
-begin
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Apenas o administrador pode limpar fotos.';
-  end if;
-  return query
-    select o.name::text, coalesce((o.metadata ->> 'size')::bigint, 0), o.created_at
-    from storage.objects o
-    where o.bucket_id = 'fotos'
-      and o.created_at < now() - make_interval(months => meses)
-      and not exists (select 1 from public.trips t where t.status = 'em_andamento' and t.foto_inicio = o.name)
-    order by o.created_at
-    limit limite;
-end;
-$$;
-
--- Resumo para a tela: total guardado e quanto seria removido
-create or replace function public.resumo_fotos(meses integer)
-returns table (total bigint, total_bytes bigint, antigas bigint, antigas_bytes bigint)
-language plpgsql
-stable
-security definer set search_path = public, storage
-as $$
-begin
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Apenas o administrador pode consultar as fotos.';
-  end if;
-  return query
-    select
-      (select count(*) from storage.objects where bucket_id = 'fotos'),
-      (select coalesce(sum((metadata ->> 'size')::bigint), 0)::bigint from storage.objects where bucket_id = 'fotos'),
-      (select count(*) from public.fotos_para_limpar(meses, 2147483647)),
-      (select coalesce(sum(tamanho), 0)::bigint from public.fotos_para_limpar(meses, 2147483647));
-end;
-$$;
-
--- Depois de apagar os arquivos: limpa os campos que apontavam para fotos que não existem mais
-create or replace function public.limpar_referencias_fotos()
-returns void
-language plpgsql
-security definer set search_path = public, storage
-as $$
-begin
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Apenas o administrador pode limpar fotos.';
-  end if;
-  update public.trips t set foto_inicio = null
-   where foto_inicio is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = t.foto_inicio);
-  update public.trips t set foto_fim = null
-   where foto_fim is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = t.foto_fim);
-  update public.vehicles v set foto_km_inicial = null
-   where foto_km_inicial is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = v.foto_km_inicial);
-  update public.tire_measurements m set foto_de = null
-   where foto_de is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = m.foto_de);
-  update public.tire_measurements m set foto_dd = null
-   where foto_dd is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = m.foto_dd);
-  update public.tire_measurements m set foto_te = null
-   where foto_te is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = m.foto_te);
-  update public.tire_measurements m set foto_td = null
-   where foto_td is not null and not exists (select 1 from storage.objects o where o.bucket_id = 'fotos' and o.name = m.foto_td);
-end;
-$$;
-
-create or replace function public.registrar_limpeza(qtd integer, tamanho bigint, meses integer)
-returns void
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Apenas o administrador pode limpar fotos.';
-  end if;
-  insert into public.limpezas_fotos (executada_por, automatica, meses, quantidade, bytes)
-  values (auth.uid(), auth.uid() is null, meses, qtd, tamanho);
-end;
-$$;
-
--- Só usuários logados e a rotina do servidor (service_role) podem chamar estas funções
-revoke all on function public.fotos_para_limpar(integer, integer) from public, anon;
-revoke all on function public.resumo_fotos(integer) from public, anon;
-revoke all on function public.limpar_referencias_fotos() from public, anon;
-revoke all on function public.registrar_limpeza(integer, bigint, integer) from public, anon;
-grant execute on function public.fotos_para_limpar(integer, integer) to authenticated, service_role;
-grant execute on function public.resumo_fotos(integer) to authenticated, service_role;
-grant execute on function public.limpar_referencias_fotos() to authenticated, service_role;
-grant execute on function public.registrar_limpeza(integer, bigint, integer) to authenticated, service_role;
-
-
--- ---------------------------------------------------------------------
 -- 6. PERMISSÕES (quem pode ver e alterar o quê)
 -- ---------------------------------------------------------------------
 alter table public.profiles enable row level security;
@@ -529,12 +394,6 @@ alter table public.maintenances enable row level security;
 alter table public.tire_measurements enable row level security;
 alter table public.vehicle_users enable row level security;
 alter table public.configuracoes enable row level security;
-alter table public.limpezas_fotos enable row level security;
-
--- Histórico de limpezas: só o ADM vê
-drop policy if exists "admin ve limpezas" on public.limpezas_fotos;
-create policy "admin ve limpezas" on public.limpezas_fotos
-  for select using (public.is_admin());
 
 -- Parâmetros da frota: todos leem; só ADM altera
 drop policy if exists "logado le configuracoes" on public.configuracoes;
@@ -633,12 +492,6 @@ drop policy if exists "ve fotos proprias ou admin" on storage.objects;
 create policy "ve fotos proprias ou admin" on storage.objects
   for select to authenticated
   using (bucket_id = 'fotos' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin()));
-
--- Só o ADM apaga fotos (limpeza de fotos antigas)
-drop policy if exists "admin exclui fotos" on storage.objects;
-create policy "admin exclui fotos" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'fotos' and public.is_admin());
 
 
 -- ---------------------------------------------------------------------

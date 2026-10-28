@@ -43,12 +43,6 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     ...listaMedicoes.flatMap((m) => PNEUS.map((p) => m[p.foto])),
   ]);
   const nome = (p: ComUsuario<unknown>["profiles"]) => p?.nome || p?.email || "—";
-  const FotoViagem = ({ caminho, rotulo }: { caminho: string | null; rotulo: string }) =>
-    caminho ? (
-      <Foto caminho={caminho} rotulo={rotulo} />
-    ) : (
-      <span title="Foto removida pela limpeza de fotos antigas" className="ml-1.5 align-middle text-[11px] text-texto-2">(foto removida)</span>
-    );
   const Foto = ({ caminho, rotulo }: { caminho: string | null; rotulo: string }) =>
     caminho && fotos[caminho] ? (
       <a href={fotos[caminho]} target="_blank" title={`Abrir ${rotulo}`} className="ml-1.5 inline-flex items-center gap-1 align-middle text-xs text-primaria-texto hover:underline">
@@ -142,9 +136,9 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
                         <td className="whitespace-nowrap">{dataHora(t.iniciada_em)}</td>
                         <td className="whitespace-nowrap">{nome(t.profiles)}</td>
                         <td>{t.destino || <span className="text-texto-2">—</span>}</td>
-                        <td className="num">{km(t.km_inicio)}<FotoViagem caminho={t.foto_inicio} rotulo="foto da saída" /></td>
+                        <td className="num">{km(t.km_inicio)}<Foto caminho={t.foto_inicio} rotulo="foto da saída" /></td>
                         <td className="num">
-                          {t.km_fim !== null ? <>{km(t.km_fim)}<FotoViagem caminho={t.foto_fim} rotulo="foto da chegada" /></> : <Selo nivel="info">Em andamento</Selo>}
+                          {t.km_fim !== null ? <>{km(t.km_fim)}<Foto caminho={t.foto_fim} rotulo="foto da chegada" /></> : <Selo nivel="info">Em andamento</Selo>}
                         </td>
                         <td className="num font-semibold">{t.km_fim !== null ? km(t.km_fim - t.km_inicio) : "—"}</td>
                       </tr>

@@ -105,12 +105,3 @@ export function pendencias(v: Vehicle, kmAtual = v.km_atual): Pendencia[] {
   }
   return lista.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === "critico" ? -1 : 1));
 }
-
-/** 1536000 -> "1,5 MB" */
-export function tamanho(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  const un = ["KB", "MB", "GB"];
-  let v = bytes / 1024, i = 0;
-  while (v >= 1024 && i < un.length - 1) { v /= 1024; i++; }
-  return `${v.toLocaleString("pt-BR", { maximumFractionDigits: v < 10 ? 1 : 0 })} ${un[i]}`;
-}

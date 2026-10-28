@@ -40,7 +40,7 @@ export type Trip = {
   user_id: string;
   destino: string;
   km_inicio: number;
-  foto_inicio: string | null;
+  foto_inicio: string;
   iniciada_em: string;
   km_fim: number | null;
   foto_fim: string | null;
@@ -77,21 +77,9 @@ export type TireMeasurement = {
   created_at: string;
 };
 
-export type LimpezaFotos = {
-  id: string;
-  executada_em: string;
-  executada_por: string | null;
-  automatica: boolean;
-  meses: number;
-  quantidade: number;
-  bytes: number;
-};
-
 export type Configuracoes = {
   intervalo_oleo: number;
   intervalo_revisao: number;
-  meses_guardar_fotos: number;
-  limpeza_fotos_ativa: boolean;
   atualizado_por: string | null;
   atualizado_em: string | null;
 };
