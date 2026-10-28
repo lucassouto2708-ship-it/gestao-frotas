@@ -20,8 +20,31 @@ const CINZA: [number, number, number] = [107, 114, 128];
 const LINHA: [number, number, number] = [226, 229, 233];
 const FUNDO: [number, number, number] = [243, 245, 248];
 
+/** Logo do sistema (SVG) convertida em imagem para o PDF; se falhar, o relatório sai sem ela. */
+async function carregarLogo(): Promise<string | null> {
+  try {
+    const svg = await (await fetch("/icon.svg")).text();
+    const img = new Image();
+    await new Promise<void>((ok, falha) => {
+      img.onload = () => ok();
+      img.onerror = () => falha();
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#1e4e8c"; // mesmo azul da faixa: os cantos arredondados não aparecem
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.drawImage(img, 0, 0, 256, 256);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
 export async function gerarPdf(r: Relatorio) {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+  const logo = await carregarLogo();
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -31,10 +54,13 @@ export async function gerarPdf(r: Relatorio) {
   doc.setFillColor(...AZUL);
   doc.rect(0, 0, W, 22, "F");
   doc.setTextColor(255, 255, 255);
+  // A logo é azul sobre azul (mesma cor da faixa): só a marca branca aparece
+  if (logo) doc.addImage(logo, "PNG", M, 3, 16, 16);
+  const xTexto = logo ? M + 20 : M;
   doc.setFont("helvetica", "bold").setFontSize(15);
-  doc.text("Gestão de Frotas", M, 10.5);
+  doc.text("Gestão de Frotas", xTexto, 10.5);
   doc.setFont("helvetica", "normal").setFontSize(9.5);
-  doc.text(r.organizacao ?? "Controle de quilometragem, manutenção e pneus", M, 16.5);
+  doc.text(r.organizacao ?? "Controle de quilometragem, manutenção e pneus", xTexto, 16.5);
   doc.setFontSize(9.5);
   doc.text(r.titulo, W - M, 10.5, { align: "right" });
   const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
