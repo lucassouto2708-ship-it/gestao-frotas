@@ -1,8 +1,8 @@
 import { CalendarDays } from "lucide-react";
 import { Indicador, Pagina } from "@/components/Pagina";
 import { PNEUS, formatarPlaca, km, nivelPneu, piorNivel, statusOleo, statusRevisao } from "@/lib/regras";
-import { requireAdmin } from "@/lib/supabase/server";
-import type { TireMeasurement, Trip, Vehicle } from "@/lib/types";
+import { requireGestor } from "@/lib/supabase/server";
+import type { Organizacao, TireMeasurement, Trip, Vehicle } from "@/lib/types";
 import { TabelaFrota, type LinhaFrota } from "./TabelaFrota";
 
 function mesAtual() {
@@ -22,18 +22,26 @@ function nomeDoMes(mes: string) {
   return nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
-export default async function PainelAdmin({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
-  const { supabase } = await requireAdmin();
-  const { mes: mesParam } = await searchParams;
+export default async function PainelAdmin({ searchParams }: { searchParams: Promise<{ mes?: string; org?: string }> }) {
+  const { supabase, profile } = await requireGestor();
+  const { mes: mesParam, org: orgParam } = await searchParams;
+  const admin = profile.role === "admin";
   const mes = mesParam && /^\d{4}-\d{2}$/.test(mesParam) ? mesParam : mesAtual();
   const { inicio, fim } = intervaloDoMes(mes);
 
+  // O gestor só enxerga a própria organização (o banco garante); o ADM pode filtrar por uma
+  const { data: orgsData } = admin ? await supabase.from("organizacoes").select("*").order("nome") : { data: [] };
+  const organizacoes = (orgsData ?? []) as Organizacao[];
+  const orgFiltro = admin && organizacoes.some((o) => o.id === orgParam) ? orgParam! : null;
+  const nomeOrg = new Map(organizacoes.map((o) => [o.id, o.nome]));
+  const daOrg: Record<string, string> = orgFiltro ? { organizacao_id: orgFiltro } : {};
+
   const [{ data: veiculos }, { data: viagensMes }, { data: abertas }, { data: medicoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
-    supabase.from("vehicles").select("*").order("placa"),
-    supabase.from("trips").select("vehicle_id, km_inicio, km_fim").eq("status", "finalizada").gte("finalizada_em", inicio).lt("finalizada_em", fim),
-    supabase.from("trips").select("vehicle_id").eq("status", "em_andamento"),
-    supabase.from("tire_measurements").select("*").order("created_at", { ascending: false }),
-    supabase.from("vehicle_users").select("vehicle_id, user_id"),
+    supabase.from("vehicles").select("*").match(daOrg).order("placa"),
+    supabase.from("trips").select("vehicle_id, km_inicio, km_fim").eq("status", "finalizada").gte("finalizada_em", inicio).lt("finalizada_em", fim).match(daOrg),
+    supabase.from("trips").select("vehicle_id").eq("status", "em_andamento").match(daOrg),
+    supabase.from("tire_measurements").select("*").match(daOrg).order("created_at", { ascending: false }),
+    supabase.from("vehicle_users").select("vehicle_id, user_id").match(daOrg),
     supabase.from("profiles").select("id, nome, email"),
   ]);
   const nomeDe = new Map(((perfis ?? []) as { id: string; nome: string; email: string | null }[]).map((p) => [p.id, p.nome || p.email || "—"]));
@@ -67,6 +75,7 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
       revisao: statusRevisao(v),
       pneus: med ? piorNivel(PNEUS.map((p) => nivelPneu(Number(med[p.campo])))) : null,
       motoristas: motoristasDe(v.id),
+      org: admin && !orgFiltro ? nomeOrg.get(v.organizacao_id) : undefined,
     };
   });
   const totalKm = lista.reduce((s, l) => s + l.kmMes, 0);
@@ -79,7 +88,15 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
       titulo="Painel da frota"
       descricao={`Situação dos veículos, quilometragem e pendências de manutenção — competência ${nomeDoMes(mes)}.`}
       acoes={
-        <form className="flex items-center gap-2">
+        <form className="flex flex-wrap items-center gap-2">
+          {admin && (
+            <select name="org" aria-label="Organização" defaultValue={orgFiltro ?? ""} className="campo w-52">
+              <option value="">Todas as organizações</option>
+              {organizacoes.map((o) => (
+                <option key={o.id} value={o.id}>{o.nome}</option>
+              ))}
+            </select>
+          )}
           <label htmlFor="mes" className="flex items-center gap-1.5 text-[13px] font-medium text-texto-2">
             <CalendarDays size={15} /> Competência
           </label>

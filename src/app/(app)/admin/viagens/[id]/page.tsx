@@ -6,12 +6,12 @@ import { RotaSvg } from "@/components/rastreio/RotaSvg";
 import { linksDasFotos } from "@/lib/fotos";
 import type { ResumoRastreio } from "@/lib/rastreio";
 import { compararDistancias, dataHora, formatarPlaca, km, kmGps } from "@/lib/regras";
-import { requireAdmin } from "@/lib/supabase/server";
+import { requireGestor } from "@/lib/supabase/server";
 import type { Profile, Trip, TripTrilha, Vehicle } from "@/lib/types";
 
 export default async function DetalheViagem({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireGestor();
   const [{ data }, { data: trilha }] = await Promise.all([
     supabase.from("trips").select("*, vehicles(*), profiles(nome, email)").eq("id", id).maybeSingle(),
     supabase.from("trip_trilhas").select("pontos").eq("trip_id", id).maybeSingle<Pick<TripTrilha, "pontos">>(),

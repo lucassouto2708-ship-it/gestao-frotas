@@ -1,15 +1,42 @@
-export type Role = "admin" | "comum";
+/** admin: dono do sistema (todas as organizações). gestor: administra uma organização. motorista: só viagens. */
+export type Role = "admin" | "gestor" | "motorista";
+
+export const ROTULO_PAPEL: Record<Role, string> = { admin: "ADM", gestor: "Gestor", motorista: "Motorista" };
 
 export type Profile = {
   id: string;
   nome: string;
   email: string | null;
   role: Role;
+  organizacao_id: string | null;
+  ativo: boolean;
   created_at: string;
+};
+
+export type Organizacao = {
+  id: string;
+  nome: string;
+  tipo: "empresa" | "municipio";
+  ativa: boolean;
+  criada_em: string;
+  criada_por: string | null;
+};
+
+export type Convite = {
+  id: string;
+  codigo: string;
+  organizacao_id: string;
+  papel: "gestor" | "motorista";
+  criado_por: string | null;
+  criado_em: string;
+  expira_em: string;
+  usado_por: string | null;
+  usado_em: string | null;
 };
 
 export type Vehicle = {
   id: string;
+  organizacao_id: string;
   placa: string;
   modelo: string;
   km_inicial: number;

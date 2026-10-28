@@ -6,12 +6,12 @@ import { HistoricoManutencao, type ManutencaoComUsuario } from "@/components/man
 import { StatusManutencao } from "@/components/manutencao/StatusManutencao";
 import { Pagina, Painel } from "@/components/Pagina";
 import { dataHora, formatarPlaca, km } from "@/lib/regras";
-import { getProfile } from "@/lib/supabase/server";
+import { requireGestor } from "@/lib/supabase/server";
 import type { Vehicle } from "@/lib/types";
 
 export default async function FichaVeiculo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, profile } = await getProfile();
+  const { supabase } = await requireGestor();
   const [{ data: v }, { data: manutencoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
     supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
@@ -19,7 +19,6 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
     supabase.from("profiles").select("id, nome, email"),
   ]);
   if (!v) notFound();
-  const admin = profile.role === "admin";
   const nomeDe = new Map(((perfis ?? []) as { id: string; nome: string; email: string | null }[]).map((p) => [p.id, p.nome || p.email || "—"]));
   const motoristas = ((vinculos ?? []) as { user_id: string }[]).map((l) => nomeDe.get(l.user_id) ?? "—").sort();
 
@@ -28,7 +27,7 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
       titulo={`Veículo ${formatarPlaca(v.placa)}`}
       descricao={`${v.modelo || "Modelo não informado"} · cadastrado em ${dataHora(v.created_at)}`}
       voltar="/veiculos"
-      acoes={admin && <Link href={`/admin/veiculos/${v.id}`} className="botao-secundario"><BarChart3 size={15} /> Ficha completa (ADM)</Link>}
+      acoes={<Link href={`/admin/veiculos/${v.id}`} className="botao-secundario"><BarChart3 size={15} /> Ficha completa</Link>}
     >
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
@@ -48,7 +47,7 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
             </dl>
             <StatusManutencao veiculo={v} />
           </Painel>
-          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin={admin} />
+          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin />
         </div>
         <Painel titulo="Registrar manutenção" className="order-first self-start scroll-mt-28 xl:order-none" id="registrar">
           <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />

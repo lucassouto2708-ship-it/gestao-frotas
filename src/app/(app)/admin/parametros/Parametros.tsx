@@ -38,7 +38,7 @@ function CampoKm({ valor, onChange, rotulo, id }: { valor: string; onChange: (v:
 }
 
 /** Padrão usado no cadastro de novos veículos, com opção de aplicar a toda a frota. */
-export function PadraoFrota({ oleo, revisao, totalVeiculos }: { oleo: number; revisao: number; totalVeiculos: number }) {
+export function PadraoFrota({ organizacaoId, oleo, revisao, totalVeiculos }: { organizacaoId: string; oleo: number; revisao: number; totalVeiculos: number }) {
   const router = useRouter();
   const [o, setO] = useState(String(oleo));
   const [r, setR] = useState(String(revisao));
@@ -59,7 +59,7 @@ export function PadraoFrota({ oleo, revisao, totalVeiculos }: { oleo: number; re
     const v = validar();
     if (!v) return;
     setOcupado("salvar");
-    const { error } = await createClient().from("configuracoes").update(v).eq("id", true);
+    const { error } = await createClient().from("configuracoes").update(v).eq("organizacao_id", organizacaoId);
     setOcupado(null);
     if (error) return setMsg({ ok: false, texto: error.message });
     setMsg({ ok: true, texto: "Padrão salvo. Vale para os próximos veículos cadastrados." });
@@ -73,8 +73,8 @@ export function PadraoFrota({ oleo, revisao, totalVeiculos }: { oleo: number; re
     setOcupado("aplicar");
     const supabase = createClient();
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
-      supabase.from("configuracoes").update(v).eq("id", true),
-      supabase.from("vehicles").update(v).not("id", "is", null),
+      supabase.from("configuracoes").update(v).eq("organizacao_id", organizacaoId),
+      supabase.from("vehicles").update(v).eq("organizacao_id", organizacaoId),
     ]);
     setOcupado(null);
     if (e1 || e2) return setMsg({ ok: false, texto: (e1 ?? e2)!.message });

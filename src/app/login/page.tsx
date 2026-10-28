@@ -5,6 +5,19 @@ import { Loader2, LogIn, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+/** Para onde voltar depois do login (só caminhos internos). Guarda o código de convite, se houver. */
+function destinoAposLogin() {
+  try {
+    const next = new URLSearchParams(window.location.search).get("next") ?? "";
+    if (!next.startsWith("/") || next.startsWith("//")) return "/";
+    const codigo = new URL(next, window.location.origin).searchParams.get("c");
+    if (next.startsWith("/convite") && codigo) localStorage.setItem("convite_codigo", codigo);
+    return next;
+  } catch {
+    return "/";
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
@@ -26,7 +39,7 @@ export default function LoginPage() {
       if (error) {
         setErro("E-mail ou senha inválidos.");
       } else {
-        router.replace("/");
+        router.replace(destinoAposLogin());
         router.refresh();
         return;
       }
@@ -35,7 +48,7 @@ export default function LoginPage() {
       if (error) {
         setErro(error.message);
       } else if (data.session) {
-        router.replace("/");
+        router.replace(destinoAposLogin());
         router.refresh();
         return;
       } else {
@@ -107,7 +120,9 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-          <p className="mt-4 text-center text-xs text-texto-2">Acesso restrito a usuários autorizados.</p>
+          <p className="mt-4 text-center text-xs text-texto-2">
+            Acesso restrito a usuários autorizados. Para entrar em uma organização, use o link ou o código de convite enviado pelo seu gestor.
+          </p>
         </div>
       </div>
     </main>

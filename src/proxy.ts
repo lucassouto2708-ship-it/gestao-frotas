@@ -30,7 +30,10 @@ export async function proxy(request: NextRequest) {
   const publica = ROTAS_PUBLICAS.some((r) => request.nextUrl.pathname.startsWith(r));
   if (!user && !publica) {
     const url = request.nextUrl.clone();
+    // Guarda para onde ia (ex.: link de convite) para voltar depois do login
+    const destino = request.nextUrl.pathname + request.nextUrl.search;
     url.pathname = "/login";
+    url.search = destino !== "/" ? `?next=${encodeURIComponent(destino)}` : "";
     return NextResponse.redirect(url);
   }
 

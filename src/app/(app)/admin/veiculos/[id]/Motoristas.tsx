@@ -9,7 +9,7 @@ import { dataHora } from "@/lib/regras";
 export type Vinculado = { id: string; nome: string; vinculadoPor: string | null; vinculadoEm: string };
 export type Usuario = { id: string; nome: string };
 
-/** ADM: escolhe quais usuários podem usar este veículo. */
+/** Gestor/ADM: escolhe quais usuários podem usar este veículo. */
 export function Motoristas({ veiculoId, vinculados, usuarios }: { veiculoId: string; vinculados: Vinculado[]; usuarios: Usuario[] }) {
   const router = useRouter();
   const [escolhido, setEscolhido] = useState("");
@@ -42,7 +42,7 @@ export function Motoristas({ veiculoId, vinculados, usuarios }: { veiculoId: str
   return (
     <div>
       {vinculados.length === 0 ? (
-        <p className="px-4 py-3 text-[13px] text-alerta">Nenhum usuário vinculado: só o ADM consegue usar este veículo.</p>
+        <p className="px-4 py-3 text-[13px] text-alerta">Nenhum motorista vinculado: nenhum motorista consegue usar este veículo (gestores da organização ainda conseguem).</p>
       ) : (
         <ul className="divide-y divide-borda">
           {vinculados.map((v) => (
@@ -67,8 +67,8 @@ export function Motoristas({ veiculoId, vinculados, usuarios }: { veiculoId: str
         </ul>
       )}
       <form onSubmit={vincular} className="flex gap-2 border-t border-borda px-4 py-3">
-        <select className="campo" value={escolhido} onChange={(e) => setEscolhido(e.target.value)} aria-label="Usuário para vincular">
-          <option value="">{disponiveis.length ? "Selecione um usuário…" : "Todos os usuários já estão vinculados"}</option>
+        <select className="campo" value={escolhido} onChange={(e) => setEscolhido(e.target.value)} aria-label="Motorista para vincular">
+          <option value="">{disponiveis.length ? "Selecione um motorista…" : "Todos os motoristas já estão vinculados"}</option>
           {disponiveis.map((u) => (
             <option key={u.id} value={u.id}>{u.nome}</option>
           ))}

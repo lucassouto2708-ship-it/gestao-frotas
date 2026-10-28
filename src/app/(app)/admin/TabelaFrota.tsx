@@ -19,6 +19,8 @@ export type LinhaFrota = {
   revisao: StatusManutencao;
   pneus: Nivel | null;
   motoristas: string[];
+  /** Nome da organização (só o ADM, que vê várias). */
+  org?: string;
 };
 
 const textoManut: Record<Nivel, string> = { ok: "Em dia", atencao: "Em breve", critico: "Vencida" };
@@ -158,7 +160,7 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
         <EstadoVazio
           icone={<CarFront size={28} strokeWidth={1.5} />}
           titulo="Nenhum veículo cadastrado"
-          texto="Os veículos cadastrados pelos operadores aparecerão aqui."
+          texto="Os veículos cadastrados pelo gestor aparecerão aqui."
           acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
         />
       ) : visiveis.length === 0 ? (
@@ -185,7 +187,7 @@ export function TabelaFrota({ linhas, competencia }: { linhas: LinhaFrota[]; com
                 return (
                   <tr key={l.id}>
                     <td className={`whitespace-nowrap ${critico ? "shadow-[inset_3px_0_0_var(--perigo)]" : ""}`}>
-                      <Link href={`/admin/veiculos/${l.id}`} className="mono link font-semibold">{l.placa}</Link>
+                      <Link href={`/admin/veiculos/${l.id}`} className="mono link font-semibold">{l.placa}</Link>{l.org && <span className="block text-xs text-texto-2">{l.org}</span>}
                     </td>
                     <td>{l.modelo || <span className="text-texto-2">—</span>}</td>
                     <td className="num font-semibold">{km(l.kmAtual)}</td>

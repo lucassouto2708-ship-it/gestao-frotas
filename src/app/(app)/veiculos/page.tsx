@@ -3,13 +3,13 @@ import { CarFront, PlusSquare, Wrench } from "lucide-react";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { data, formatarPlaca, km, statusOleo, statusRevisao } from "@/lib/regras";
-import { getProfile } from "@/lib/supabase/server";
+import { requireGestor } from "@/lib/supabase/server";
 import type { Vehicle } from "@/lib/types";
 
 const textoNivel = { ok: "Em dia", atencao: "Em breve", critico: "Vencida" } as const;
 
 export default async function Veiculos() {
-  const { supabase } = await getProfile();
+  const { supabase } = await requireGestor();
   const { data: lista } = await supabase.from("vehicles").select("*").order("placa");
   const veiculos = (lista ?? []) as Vehicle[];
 
@@ -23,8 +23,8 @@ export default async function Veiculos() {
         {veiculos.length === 0 ? (
           <EstadoVazio
             icone={<CarFront size={28} strokeWidth={1.5} />}
-            titulo="Nenhum veículo vinculado a você"
-            texto="Você só vê os veículos vinculados ao seu usuário. Peça ao administrador para vincular o seu carro, ou cadastre um veículo novo."
+            titulo="Nenhum veículo cadastrado"
+            texto="Cadastre o primeiro veículo da frota para acompanhar viagens e manutenção."
             acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
           />
         ) : (

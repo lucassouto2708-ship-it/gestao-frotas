@@ -6,7 +6,8 @@ import type { Vehicle } from "@/lib/types";
 import { FormNovaViagem } from "./FormNovaViagem";
 
 export default async function NovaViagem() {
-  const { supabase } = await getProfile();
+  const { supabase, profile } = await getProfile();
+  const gestor = profile.role !== "motorista";
   const [{ data: veiculos }, { data: abertas }] = await Promise.all([
     supabase.from("vehicles").select("*").order("placa"),
     supabase.from("trips").select("vehicle_id").eq("status", "em_andamento"),
@@ -22,8 +23,12 @@ export default async function NovaViagem() {
           <EstadoVazio
             icone={<CarFront size={28} strokeWidth={1.5} />}
             titulo="Nenhum veículo vinculado a você"
-            texto="Peça ao administrador para vincular o seu carro ao seu usuário, ou cadastre um veículo novo, para registrar viagens."
-            acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
+            texto={
+              gestor
+                ? "Cadastre um veículo para registrar viagens."
+                : "Peça ao gestor da sua organização para vincular o seu carro ao seu usuário."
+            }
+            acao={gestor ? <Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link> : undefined}
           />
         </Painel>
       )}

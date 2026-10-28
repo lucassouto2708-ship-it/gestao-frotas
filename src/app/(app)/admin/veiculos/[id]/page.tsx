@@ -8,7 +8,7 @@ import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
 import { PNEUS, compararDistancias, dataHora, formatarPlaca, km, kmGps, nivelPneu } from "@/lib/regras";
-import { requireAdmin } from "@/lib/supabase/server";
+import { requireGestor } from "@/lib/supabase/server";
 import type { Profile, TireMeasurement, Trip, Vehicle, VehicleUser } from "@/lib/types";
 import { FormConfigVeiculo } from "./Formularios";
 import { Motoristas, type Vinculado } from "./Motoristas";
@@ -17,7 +17,7 @@ type ComUsuario<T> = T & { profiles: Pick<Profile, "nome" | "email"> | null };
 
 export default async function DetalheVeiculo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireGestor();
 
   const [{ data: v }, { data: viagens }, { data: manutencoes }, { data: medicoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
@@ -25,10 +25,10 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
     supabase.from("tire_measurements").select("*, profiles(nome, email)").eq("vehicle_id", id).order("created_at", { ascending: false }).limit(10),
     supabase.from("vehicle_users").select("*").eq("vehicle_id", id).order("vinculado_em"),
-    supabase.from("profiles").select("id, nome, email, role").order("nome"),
+    supabase.from("profiles").select("id, nome, email, role, ativo, organizacao_id").order("nome"),
   ]);
   if (!v) notFound();
-  const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role">[];
+  const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role" | "ativo" | "organizacao_id">[];
   const nomeDe = new Map(listaPerfis.map((p) => [p.id, p.nome || p.email || "—"]));
   const vinculados: Vinculado[] = ((vinculos ?? []) as VehicleUser[]).map((l) => ({
     id: l.user_id,
@@ -81,7 +81,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
 
           <Painel titulo="Medições de pneus" acoes={<span className="text-xs text-texto-2">Últimas 10</span>} semPadding>
             {listaMedicoes.length === 0 ? (
-              <EstadoVazio icone={<ClipboardList size={26} strokeWidth={1.5} />} titulo="Nenhuma medição registrada" texto="As aferições do sulco feitas pelos operadores aparecerão aqui." />
+              <EstadoVazio icone={<ClipboardList size={26} strokeWidth={1.5} />} titulo="Nenhuma medição registrada" texto="As aferições do sulco feitas pelo gestor aparecerão aqui." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="tabela">
@@ -175,13 +175,15 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
         <div className="space-y-4 self-start">
           <Painel
             titulo="Motoristas vinculados"
-            acoes={<span className="text-xs text-texto-2">Só eles usam este carro</span>}
+            acoes={<span className="text-xs text-texto-2">Motoristas só usam carros vinculados</span>}
             semPadding
           >
             <Motoristas
               veiculoId={v.id}
               vinculados={vinculados}
-              usuarios={listaPerfis.filter((p) => p.role !== "admin").map((p) => ({ id: p.id, nome: nomeDe.get(p.id)! }))}
+              usuarios={listaPerfis
+                .filter((p) => p.role === "motorista" && p.ativo && p.organizacao_id === v.organizacao_id)
+                .map((p) => ({ id: p.id, nome: nomeDe.get(p.id)! }))}
             />
           </Painel>
 

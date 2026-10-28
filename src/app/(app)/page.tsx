@@ -24,17 +24,27 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const abertas = viagens.filter((v) => v.status === "em_andamento");
   const recentes = viagens.filter((v) => v.status === "finalizada").slice(0, 5);
 
+  // Motorista só inicia/finaliza viagens: vê os avisos de manutenção, mas quem registra é o gestor
+  const gestor = profile.role !== "motorista";
   const acoes = [
     { href: "/viagens/nova", icone: Gauge, titulo: "Iniciar viagem", texto: "Registrar saída com foto do odômetro" },
-    { href: "/veiculos", icone: Wrench, titulo: "Manutenção", texto: "Registrar serviço e ver histórico do veículo" },
-    { href: "/pneus/novo", icone: ClipboardList, titulo: "Medição de pneus", texto: "Profundidade do sulco (TWI) dos 4 pneus" },
-    { href: "/veiculos/novo", icone: PlusSquare, titulo: "Cadastrar veículo", texto: "Placa, modelo e quilometragem inicial" },
+    ...(gestor
+      ? [
+          { href: "/veiculos", icone: Wrench, titulo: "Manutenção", texto: "Registrar serviço e ver histórico do veículo" },
+          { href: "/pneus/novo", icone: ClipboardList, titulo: "Medição de pneus", texto: "Profundidade do sulco (TWI) dos 4 pneus" },
+          { href: "/veiculos/novo", icone: PlusSquare, titulo: "Cadastrar veículo", texto: "Placa, modelo e quilometragem inicial" },
+        ]
+      : []),
   ];
 
   return (
     <Pagina
       titulo="Início"
-      descricao={`${profile.nome ? `${profile.nome.split(" ")[0]}, r` : "R"}egistre viagens, medições de pneus e novos veículos.`}
+      descricao={
+        gestor
+          ? `${profile.nome ? `${profile.nome.split(" ")[0]}, r` : "R"}egistre viagens, medições de pneus e novos veículos.`
+          : `${profile.nome ? `${profile.nome.split(" ")[0]}, i` : "I"}nicie e finalize suas viagens com a foto do odômetro.`
+      }
     >
       {recemFinalizada && (
         <div className="mb-4 space-y-2">
@@ -50,6 +60,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             veiculoId={recemFinalizada.vehicle_id}
             placa={recemFinalizada.vehicles.placa}
             itens={pendencias(recemFinalizada.vehicles)}
+            semBotao={!gestor}
           />
         </div>
       )}
@@ -62,7 +73,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             >
               <div className="space-y-2">
                 {pendentes.map(({ v, itens }) => (
-                  <AvisoManutencao key={v.id} veiculoId={v.id} placa={v.placa} itens={itens} compacto />
+                  <AvisoManutencao key={v.id} veiculoId={v.id} placa={v.placa} itens={itens} compacto semBotao={!gestor} />
                 ))}
               </div>
             </Painel>

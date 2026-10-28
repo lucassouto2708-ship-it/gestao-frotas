@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { CarFront } from "lucide-react";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
-import { getProfile } from "@/lib/supabase/server";
+import { requireGestor } from "@/lib/supabase/server";
 import type { Vehicle } from "@/lib/types";
 import { FormPneus } from "./FormPneus";
 
 export default async function NovaMedicaoPneus() {
-  const { supabase } = await getProfile();
+  const { supabase } = await requireGestor();
   const { data: veiculos } = await supabase.from("vehicles").select("*").order("placa");
 
   return (
@@ -17,8 +17,8 @@ export default async function NovaMedicaoPneus() {
         <Painel className="max-w-2xl">
           <EstadoVazio
             icone={<CarFront size={28} strokeWidth={1.5} />}
-            titulo="Nenhum veículo vinculado a você"
-            texto="Peça ao administrador para vincular o seu carro ao seu usuário, ou cadastre um veículo novo, para registrar medições."
+            titulo="Nenhum veículo cadastrado"
+            texto="Cadastre um veículo para registrar medições de pneus."
             acao={<Link href="/veiculos/novo" className="botao">Cadastrar veículo</Link>}
           />
         </Painel>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CircleUserRound } from "lucide-react";
-import type { Profile } from "@/lib/types";
+import { ROTULO_PAPEL, type Profile } from "@/lib/types";
 import { Abas } from "./Abas";
 import { AlternarTema } from "./AlternarTema";
 import { BotaoSair } from "./BotaoSair";
@@ -8,7 +8,7 @@ import { BarraRastreio } from "./rastreio/BarraRastreio";
 
 export const VERSAO = "1.1";
 
-export function Cabecalho({ profile }: { profile: Profile }) {
+export function Cabecalho({ profile, orgNome }: { profile: Profile; orgNome: string | null }) {
   return (
     <header className="sticky top-0 z-20">
       <div className="bg-cabecalho text-cabecalho-texto">
@@ -18,7 +18,7 @@ export function Cabecalho({ profile }: { profile: Profile }) {
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-[15px] font-bold">Gestão de Frotas</span>
               <span className="hidden truncate text-[11.5px] opacity-75 sm:block">
-                Controle de quilometragem, manutenção e pneus
+                {orgNome ?? "Controle de quilometragem, manutenção e pneus"}
               </span>
             </span>
           </Link>
@@ -30,14 +30,14 @@ export function Cabecalho({ profile }: { profile: Profile }) {
               <CircleUserRound size={18} strokeWidth={1.75} className="opacity-80" />
               <span className="max-w-48 truncate">{profile.nome || profile.email}</span>
               <span className="rounded-[3px] border border-white/30 px-1.5 py-px text-[10.5px] font-semibold tracking-wide uppercase">
-                {profile.role === "admin" ? "ADM" : "Operador"}
+                {ROTULO_PAPEL[profile.role]}
               </span>
             </span>
             <BotaoSair />
           </div>
         </div>
       </div>
-      <Abas admin={profile.role === "admin"} />
+      <Abas papel={profile.role} />
       <BarraRastreio />
     </header>
   );
