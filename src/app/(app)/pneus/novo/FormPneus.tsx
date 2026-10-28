@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DiagramaPneus } from "@/components/DiagramaPneus";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { Selo } from "@/components/Selo";
 import { enviarFoto } from "@/lib/imagem";
@@ -12,8 +13,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { Vehicle } from "@/lib/types";
 
 type Campo = (typeof PNEUS)[number]["campo"];
-
-const textoNivel = { ok: "OK", atencao: "Atenção", critico: "Trocar" } as const;
 
 export function FormPneus({ veiculos }: { veiculos: Vehicle[] }) {
   const router = useRouter();
@@ -149,27 +148,16 @@ export function FormPneus({ veiculos }: { veiculos: Vehicle[] }) {
   );
 }
 
-/** Visão de cima do veículo com a situação de cada pneu. */
 function Diagrama({ valores }: { valores: Record<Campo, string> }) {
-  const celula = (campo: Campo, rotulo: string) => {
-    const n = paraNumero(valores[campo], "pneu");
-    return (
-      <div className="flex flex-col items-center gap-1 text-center">
-        <span className="text-[11px] font-semibold tracking-wider text-texto-2 uppercase">{rotulo}</span>
-        <span className="text-[16px] font-semibold tabular-nums">{n === null ? "—" : `${n.toLocaleString("pt-BR")} mm`}</span>
-        {n !== null ? <Selo nivel={nivelPneu(n)}>{textoNivel[nivelPneu(n)]}</Selo> : <Selo nivel="neutro">Pendente</Selo>}
-      </div>
-    );
-  };
+  const n = (c: Campo) => paraNumero(valores[c], "pneu");
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-5">
-      {celula("dianteiro_esquerdo", "Diant. esq.")}
-      <div className="row-span-2 flex h-36 w-14 items-start justify-center rounded-md border-2 border-borda-forte bg-superficie-2 pt-2 text-[10px] font-semibold tracking-wider text-texto-2 uppercase">
-        Frente
-      </div>
-      {celula("dianteiro_direito", "Diant. dir.")}
-      {celula("traseiro_esquerdo", "Tras. esq.")}
-      {celula("traseiro_direito", "Tras. dir.")}
-    </div>
+    <DiagramaPneus
+      medidas={{
+        dianteiro_esquerdo: n("dianteiro_esquerdo"),
+        dianteiro_direito: n("dianteiro_direito"),
+        traseiro_esquerdo: n("traseiro_esquerdo"),
+        traseiro_direito: n("traseiro_direito"),
+      }}
+    />
   );
 }

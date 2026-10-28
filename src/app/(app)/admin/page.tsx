@@ -1,4 +1,5 @@
-import { CalendarDays } from "lucide-react";
+import { FiltroUrl } from "@/components/FiltroUrl";
+import { SeletorMes } from "@/components/SeletorMes";
 import { Indicador, Pagina } from "@/components/Pagina";
 import { PNEUS, formatarPlaca, km, nivelPneu, piorNivel, statusOleo, statusRevisao } from "@/lib/regras";
 import { requireGestor } from "@/lib/supabase/server";
@@ -88,21 +89,10 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
       titulo="Painel da frota"
       descricao={`Situação dos veículos, quilometragem e pendências de manutenção — competência ${nomeDoMes(mes)}.`}
       acoes={
-        <form className="flex flex-wrap items-center gap-2">
-          {admin && (
-            <select name="org" aria-label="Organização" defaultValue={orgFiltro ?? ""} className="campo w-52">
-              <option value="">Todas as organizações</option>
-              {organizacoes.map((o) => (
-                <option key={o.id} value={o.id}>{o.nome}</option>
-              ))}
-            </select>
-          )}
-          <label htmlFor="mes" className="flex items-center gap-1.5 text-[13px] font-medium text-texto-2">
-            <CalendarDays size={15} /> Competência
-          </label>
-          <input id="mes" name="mes" type="month" defaultValue={mes} className="campo w-48" />
-          <button className="botao-secundario">Aplicar</button>
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          {admin && <FiltroUrl parametro="org" rotulo="Organização" valor={orgFiltro ?? ""} todas="Todas as organizações" opcoes={organizacoes.map((o) => ({ id: o.id, nome: o.nome }))} className="campo w-52" />}
+          <SeletorMes mes={mes} />
+        </div>
       }
     >
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
