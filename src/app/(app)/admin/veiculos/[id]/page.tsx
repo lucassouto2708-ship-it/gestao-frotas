@@ -7,8 +7,10 @@ import { StatusManutencao } from "@/components/manutencao/StatusManutencao";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
+import { BotaoPdf } from "@/components/BotaoPdf";
 import { PNEUS, compararDistancias, dataHora, formatarPlaca, km, kmGps, nivelPneu } from "@/lib/regras";
 import { requireGestor } from "@/lib/supabase/server";
+import type { Relatorio } from "@/lib/pdf";
 import type { Profile, TireMeasurement, Trip, Vehicle, VehicleUser } from "@/lib/types";
 import { FormConfigVeiculo } from "./Formularios";
 import { Motoristas, type Vinculado } from "./Motoristas";
@@ -17,7 +19,7 @@ type ComUsuario<T> = T & { profiles: Pick<Profile, "nome" | "email"> | null };
 
 export default async function DetalheVeiculo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireGestor();
+  const { supabase, profile } = await requireGestor();
 
   const [{ data: v }, { data: viagens }, { data: manutencoes }, { data: medicoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
@@ -28,6 +30,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     supabase.from("profiles").select("id, nome, email, role, ativo, organizacao_id").order("nome"),
   ]);
   if (!v) notFound();
+  const { data: orgDoVeiculo } = await supabase.from("organizacoes").select("nome").eq("id", v.organizacao_id).maybeSingle();
   const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role" | "ativo" | "organizacao_id">[];
   const nomeDe = new Map(listaPerfis.map((p) => [p.id, p.nome || p.email || "—"]));
   const vinculados: Vinculado[] = ((vinculos ?? []) as VehicleUser[]).map((l) => ({
@@ -44,6 +47,43 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     ...listaMedicoes.flatMap((m) => PNEUS.map((p) => m[p.foto])),
   ]);
   const nome = (p: ComUsuario<unknown>["profiles"]) => p?.nome || p?.email || "—";
+  const finalizadas = listaViagens.filter((t) => t.km_fim !== null);
+  const relatorioViagens: Relatorio = {
+    titulo: "Histórico de viagens",
+    organizacao: orgDoVeiculo?.nome ?? null,
+    veiculo: { placa: formatarPlaca(v.placa), modelo: v.modelo, kmAtual: km(v.km_atual) },
+    resumo: [
+      ["Viagens no relatório", String(listaViagens.length)],
+      ["Finalizadas", String(finalizadas.length)],
+      ["Km percorridos", km(finalizadas.reduce((s, t) => s + (t.km_fim! - t.km_inicio), 0))],
+    ],
+    colunas: [
+      { titulo: "Saída", largura: 34 },
+      { titulo: "Motorista", largura: 50 },
+      { titulo: "Destino" },
+      { titulo: "Km inicial", direita: true, largura: 28 },
+      { titulo: "Km final", direita: true, largura: 28 },
+      { titulo: "Percorrido", direita: true, largura: 26 },
+      { titulo: "GPS", largura: 40 },
+    ],
+    linhas: listaViagens.map((t) => {
+      const rodado = t.km_fim !== null ? t.km_fim - t.km_inicio : null;
+      const c = rodado !== null && t.gps_distancia_m != null ? compararDistancias(rodado, t.gps_distancia_m, t.gps_cobertura) : null;
+      return [
+        dataHora(t.iniciada_em),
+        nome(t.profiles),
+        t.destino || "-",
+        km(t.km_inicio),
+        t.km_fim !== null ? km(t.km_fim) : "Em andamento",
+        rodado !== null ? km(rodado) : "-",
+        t.gps_distancia_m != null ? `${kmGps(t.gps_distancia_m)} (${t.gps_cobertura}%)${c && c.nivel !== "sem_dados" ? (c.nivel === "ok" ? " - confere" : " - divergência") : ""}` : "sem GPS",
+      ];
+    }),
+    vazio: "Nenhuma viagem registrada.",
+    nota: "Até as 50 viagens mais recentes. O odômetro é o registro oficial; o GPS é usado para conferência.",
+    emitidoPor: profile.nome || profile.email || "—",
+    arquivo: `viagens-${v.placa}.pdf`,
+  };
   const Foto = ({ caminho, rotulo }: { caminho: string | null; rotulo: string }) =>
     caminho && fotos[caminho] ? (
       <a href={fotos[caminho]} target="_blank" title={`Abrir ${rotulo}`} className="ml-1.5 inline-flex items-center gap-1 align-middle text-xs text-primaria-texto hover:underline">
@@ -115,7 +155,16 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
             )}
           </Painel>
 
-          <Painel titulo="Viagens" acoes={<span className="text-xs text-texto-2">Últimas 50</span>} semPadding>
+          <Painel
+            titulo="Viagens"
+            acoes={
+              <span className="flex items-center gap-3">
+                <span className="text-xs text-texto-2">Últimas 50</span>
+                {listaViagens.length > 0 && <BotaoPdf relatorio={relatorioViagens} />}
+              </span>
+            }
+            semPadding
+          >
             {listaViagens.length === 0 ? (
               <EstadoVazio icone={<Route size={26} strokeWidth={1.5} />} titulo="Nenhuma viagem registrada" />
             ) : (
@@ -169,7 +218,11 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
             )}
           </Painel>
 
-          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin />
+          <HistoricoManutencao
+            registros={(manutencoes ?? []) as ManutencaoComUsuario[]}
+            admin
+            pdf={{ placa: v.placa, modelo: v.modelo, kmAtual: v.km_atual, organizacao: orgDoVeiculo?.nome ?? null, emitidoPor: profile.nome || profile.email || "—" }}
+          />
         </div>
 
         <div className="space-y-4 self-start">

@@ -11,7 +11,7 @@ import type { Vehicle } from "@/lib/types";
 
 export default async function FichaVeiculo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireGestor();
+  const { supabase, profile } = await requireGestor();
   const [{ data: v }, { data: manutencoes }, { data: vinculos }, { data: perfis }] = await Promise.all([
     supabase.from("vehicles").select("*").eq("id", id).maybeSingle<Vehicle>(),
     supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
@@ -19,6 +19,7 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
     supabase.from("profiles").select("id, nome, email"),
   ]);
   if (!v) notFound();
+  const { data: orgDoVeiculo } = await supabase.from("organizacoes").select("nome").eq("id", v.organizacao_id).maybeSingle();
   const nomeDe = new Map(((perfis ?? []) as { id: string; nome: string; email: string | null }[]).map((p) => [p.id, p.nome || p.email || "—"]));
   const motoristas = ((vinculos ?? []) as { user_id: string }[]).map((l) => nomeDe.get(l.user_id) ?? "—").sort();
 
@@ -47,7 +48,7 @@ export default async function FichaVeiculo({ params }: { params: Promise<{ id: s
             </dl>
             <StatusManutencao veiculo={v} />
           </Painel>
-          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin />
+          <HistoricoManutencao registros={(manutencoes ?? []) as ManutencaoComUsuario[]} admin pdf={{ placa: v.placa, modelo: v.modelo, kmAtual: v.km_atual, organizacao: orgDoVeiculo?.nome ?? null, emitidoPor: profile.nome || profile.email || "—" }} />
         </div>
         <Painel titulo="Registrar manutenção" className="order-first self-start scroll-mt-28 xl:order-none" id="registrar">
           <FormManutencao veiculoId={v.id} kmAtual={v.km_atual} />
