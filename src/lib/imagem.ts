@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Reduz a foto da câmera (vários MB) para um JPEG leve antes do upload. */
-export async function comprimirImagem(arquivo: File, maxLado = 1600, qualidade = 0.8): Promise<Blob> {
+/** Reduz a foto da câmera (vários MB) para um JPEG leve (~100 KB) antes de ler e enviar. 1200 px mantém a leitura dos números e economiza espaço. */
+export async function comprimirImagem(arquivo: File, maxLado = 1200, qualidade = 0.8): Promise<Blob> {
   const bitmap = await createImageBitmap(arquivo, { imageOrientation: "from-image" });
   const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");

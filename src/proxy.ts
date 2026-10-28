@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ROTAS_PUBLICAS = ["/login"];
+// /api/limpeza-fotos é chamada pela Vercel (sem login); ela mesma confere o CRON_SECRET.
+const ROTAS_PUBLICAS = ["/login", "/api/limpeza-fotos"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

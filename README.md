@@ -6,6 +6,7 @@ Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) p
 - **Viagens**: o motorista tira foto do mostrador na saída e na chegada. O app calcula os km rodados.
 - **Manutenção**: aviso de troca de óleo (padrão a cada **10.000 km**) e revisão (padrão a cada **20.000 km**), com alerta ao atingir 90% do intervalo. No cadastro do carro dá para informar a última troca de óleo e a última revisão. Depois, qualquer usuário registra serviços (óleo, revisão, pneus, freios, bateria, outros) com km, data e custo, e cada carro tem seu **histórico de manutenção**. Troca de óleo e revisão zeram o contador. Só o ADM exclui registros. Os intervalos podem ser alterados por carro.
 - **Pneus (TWI)**: medição do sulco dos 4 pneus (dianteiro/traseiro, esquerdo/direito) com foto do medidor. Abaixo de 1,6 mm (TWI, mínimo legal) aparece "Trocar"; abaixo de 3 mm, "Atenção".
+- **Fotos leves e limpeza automática**: as fotos são reduzidas para 1200 px (~100 KB cada) antes do envio. O ADM define por quantos meses guardá-las (padrão 6) e, passado o prazo, as fotos são apagadas para economizar espaço. Os números (km, mm) e o histórico continuam.
 - **Leitura das fotos com marcação**: depois de tirar a foto, o usuário marca com um retângulo onde estão os números (no medidor de pneu o app já sugere a área sozinho). O app lê só aquele trecho: primeiro com um leitor próprio de visores de 7 segmentos (medidor de sulco e odômetros digitais, de fundo claro ou escuro) e, se não conseguir, com o [Tesseract.js](https://github.com/naptha/tesseract.js). Tudo roda no próprio celular, de graça e sem chave de API. O valor é sempre conferido pelo usuário antes de salvar. O sulco do pneu é guardado com 2 casas decimais (ex.: 1,27 mm).
 
 ## Tipos de usuário
@@ -64,6 +65,19 @@ Rode o app (`npm install` e depois `npm run dev`), abra http://localhost:3000 e 
 ## Publicar (Vercel)
 
 Importe o repositório na [Vercel](https://vercel.com), cadastre as duas variáveis `NEXT_PUBLIC_SUPABASE_*` e publique. Em *Authentication → URL Configuration* do Supabase, coloque a URL da Vercel como *Site URL*.
+
+## Limpeza automática de fotos antigas (opcional)
+
+Sem este passo, o app funciona normalmente e o ADM apaga as fotos antigas pelo botão **Limpar agora**, na aba **Parâmetros**. Para a limpeza rodar sozinha todo dia de madrugada (a Vercel chama `/api/limpeza-fotos` conforme o `vercel.json`):
+
+1. No Supabase: **Project Settings → API Keys → Secret keys** e copie a chave **secret** (`sb_secret_...`). Ela dá acesso total ao banco: nunca a coloque no código, em prints ou em variável com `NEXT_PUBLIC_`.
+2. Na Vercel: **Settings → Environment Variables** e crie duas variáveis (marque **Sensitive**):
+   - `SUPABASE_SERVICE_ROLE_KEY` = a chave secret copiada
+   - `CRON_SECRET` = um texto aleatório longo (30 letras e números, por exemplo)
+3. Faça um novo deploy (**Deployments → ⋯ → Redeploy**) para as variáveis valerem.
+4. Em **Parâmetros → Limpeza de fotos antigas** deve aparecer **"Automática ativa"**.
+
+Dá para ligar/desligar a limpeza automática e mudar o prazo (1 a 60 meses) na própria tela. Fotos de viagens ainda em andamento nunca são apagadas.
 
 ## Estrutura
 
