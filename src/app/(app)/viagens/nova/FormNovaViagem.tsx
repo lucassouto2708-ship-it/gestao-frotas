@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
 import { formatarPlaca, km } from "@/lib/regras";
+import { useRastreio } from "@/components/rastreio/RastreioProvider";
 import { createClient } from "@/lib/supabase/client";
 import type { Vehicle } from "@/lib/types";
 
 export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso: string[] }) {
   const router = useRouter();
+  const rastreio = useRastreio();
   // Só um carro disponível para o usuário: já vem selecionado
   const livres = veiculos.filter((v) => !emUso.includes(v.id));
   const [veiculoId, setVeiculoId] = useState(livres.length === 1 ? livres[0].id : "");
@@ -37,14 +39,19 @@ export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const caminho = await enviarFoto(supabase, user!.id, foto, `viagem-inicio-${veiculo.placa}`);
-      const { error } = await supabase.from("trips").insert({
-        vehicle_id: veiculo.id,
-        user_id: user!.id,
-        destino,
-        km_inicio: kmInicio,
-        foto_inicio: caminho,
-      });
+      const { data: criada, error } = await supabase
+        .from("trips")
+        .insert({
+          vehicle_id: veiculo.id,
+          user_id: user!.id,
+          destino,
+          km_inicio: kmInicio,
+          foto_inicio: caminho,
+        })
+        .select("id")
+        .single();
       if (error) throw new Error(error.code === "23505" ? "Este carro já está com uma viagem em andamento." : error.message);
+      rastreio.iniciar(criada.id, veiculo.placa); // pede a localização e passa a rastrear
       router.push("/");
       router.refresh();
     } catch (err) {

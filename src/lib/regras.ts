@@ -105,3 +105,58 @@ export function pendencias(v: Vehicle, kmAtual = v.km_atual): Pendencia[] {
   }
   return lista.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === "critico" ? -1 : 1));
 }
+
+export type Comparacao = {
+  nivel: Nivel | "sem_dados";
+  /** GPS menos odômetro, em km. */
+  diferencaKm: number;
+  /** Diferença em % do odômetro. */
+  pct: number;
+  texto: string;
+};
+
+const km1 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/**
+ * Compara a distância do odômetro (oficial) com a do GPS.
+ * Atenção: diferença de pelo menos 10% e 2 km. Crítico: pelo menos 25% e 5 km.
+ * Com cobertura abaixo de 80% o GPS perdeu trechos, então a comparação não é confiável.
+ */
+export function compararDistancias(odometroKm: number, gpsM: number | null | undefined, cobertura: number | null | undefined): Comparacao {
+  if (gpsM == null) return { nivel: "sem_dados", diferencaKm: 0, pct: 0, texto: "Sem rastreio por GPS nesta viagem." };
+  const gpsKm = gpsM / 1000;
+  const diferencaKm = gpsKm - odometroKm;
+  const pct = odometroKm > 0 ? (Math.abs(diferencaKm) / odometroKm) * 100 : 0;
+  if (cobertura != null && cobertura < 80) {
+    return {
+      nivel: "atencao",
+      diferencaKm,
+      pct,
+      texto: `O GPS cobriu só ${cobertura}% da viagem (tela bloqueada ou sem sinal): a comparação com o odômetro não é confiável.`,
+    };
+  }
+  const abs = Math.abs(diferencaKm);
+  if (abs >= 5 && pct >= 25) {
+    return { nivel: "critico", diferencaKm, pct, texto: textoDiferenca(diferencaKm, abs) };
+  }
+  if (abs >= 2 && pct >= 10) {
+    return { nivel: "atencao", diferencaKm, pct, texto: textoDiferenca(diferencaKm, abs) };
+  }
+  return { nivel: "ok", diferencaKm, pct, texto: `GPS e odômetro conferem (diferença de ${km1(abs)} km, ${km1(pct)}%).` };
+}
+
+function textoDiferenca(diferencaKm: number, abs: number) {
+  return diferencaKm > 0
+    ? `O GPS mediu ${km1(abs)} km a mais que o odômetro. Confira o km informado.`
+    : `O GPS mediu ${km1(abs)} km a menos que o odômetro: pode ter havido trecho sem sinal ou o km informado estar incorreto.`;
+}
+
+/** 3725000 -> "01:02:05" */
+export function duracao(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+}
+
+/** 12400 m -> "12,4 km" */
+export const kmGps = (m: number) => `${km1(m / 1000)} km`;

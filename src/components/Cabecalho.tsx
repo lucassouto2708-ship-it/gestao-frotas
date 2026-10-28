@@ -4,6 +4,7 @@ import type { Profile } from "@/lib/types";
 import { Abas } from "./Abas";
 import { AlternarTema } from "./AlternarTema";
 import { BotaoSair } from "./BotaoSair";
+import { BarraRastreio } from "./rastreio/BarraRastreio";
 
 export const VERSAO = "1.1";
 
@@ -37,6 +38,7 @@ export function Cabecalho({ profile }: { profile: Profile }) {
         </div>
       </div>
       <Abas admin={profile.role === "admin"} />
+      <BarraRastreio />
     </header>
   );
 }

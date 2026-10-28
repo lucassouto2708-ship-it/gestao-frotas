@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, ChevronRight, ClipboardList, Flag, Gauge, PlusSquare, Route, Wrench } from "lucide-react";
 import { AvisoManutencao } from "@/components/manutencao/AvisoManutencao";
+import { RastreioDaViagem } from "@/components/rastreio/RastreioDaViagem";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { dataHora, formatarPlaca, km, pendencias } from "@/lib/regras";
@@ -88,6 +89,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       <th>Saída</th>
                       <th>Destino</th>
                       <th className="num">Km inicial</th>
+                      <th>GPS</th>
                       <th className="num">Ação</th>
                     </tr>
                   </thead>
@@ -99,6 +101,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                         <td className="whitespace-nowrap">{dataHora(v.iniciada_em)}</td>
                         <td>{v.destino || "—"}</td>
                         <td className="num">{km(v.km_inicio)}</td>
+                        <td><RastreioDaViagem tripId={v.id} placa={v.vehicles.placa} /></td>
                         <td className="num">
                           <Link href={`/viagens/${v.id}/finalizar`} className="botao botao-pequeno">
                             <Flag size={13} /> Finalizar

@@ -181,6 +181,39 @@ create trigger trips_atualiza_km
 
 
 -- ---------------------------------------------------------------------
+-- 3b. RASTREIO GPS DA VIAGEM (distância pelo GPS, cobertura, velocidades e trilha)
+-- ---------------------------------------------------------------------
+-- O odômetro continua sendo o registro oficial; o GPS serve para conferir e mostrar a rota.
+alter table public.trips add column if not exists gps_distancia_m integer;
+alter table public.trips add column if not exists gps_cobertura smallint;
+alter table public.trips add column if not exists gps_interrupcoes smallint;
+alter table public.trips add column if not exists gps_pontos integer;
+alter table public.trips add column if not exists vel_max_kmh numeric(5, 1);
+alter table public.trips add column if not exists vel_media_kmh numeric(5, 1);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conrelid = 'public.trips'::regclass and conname = 'trips_gps_check') then
+    alter table public.trips add constraint trips_gps_check check (
+      (gps_distancia_m is null or gps_distancia_m between 0 and 5000000)
+      and (gps_cobertura is null or gps_cobertura between 0 and 100)
+      and (gps_interrupcoes is null or gps_interrupcoes >= 0)
+      and (gps_pontos is null or gps_pontos >= 0)
+      and (vel_max_kmh is null or vel_max_kmh between 0 and 400)
+      and (vel_media_kmh is null or vel_media_kmh between 0 and 400)
+    );
+  end if;
+end $$;
+
+-- A trilha (pontos da rota) fica em tabela própria para as listas de viagens continuarem leves
+create table if not exists public.trip_trilhas (
+  trip_id uuid primary key references public.trips (id) on delete cascade,
+  pontos jsonb not null check (jsonb_typeof(pontos) = 'array' and jsonb_array_length(pontos) <= 1000),
+  atualizado_em timestamptz not null default now()
+);
+
+
+-- ---------------------------------------------------------------------
 -- 4. MANUTENÇÕES (histórico: troca de óleo, revisão, pneus, freios...)
 -- ---------------------------------------------------------------------
 create table if not exists public.maintenances (
@@ -394,6 +427,7 @@ alter table public.maintenances enable row level security;
 alter table public.tire_measurements enable row level security;
 alter table public.vehicle_users enable row level security;
 alter table public.configuracoes enable row level security;
+alter table public.trip_trilhas enable row level security;
 
 -- Parâmetros da frota: todos leem; só ADM altera
 drop policy if exists "logado le configuracoes" on public.configuracoes;
@@ -442,7 +476,26 @@ create policy "admin exclui viagem" on public.trips
   for delete using (public.is_admin());
 -- Ao finalizar, só os campos de fim podem ser preenchidos
 revoke update on public.trips from authenticated;
-grant update (km_fim, foto_fim, finalizada_em, status) on public.trips to authenticated;
+grant update (km_fim, foto_fim, finalizada_em, status, gps_distancia_m, gps_cobertura, gps_interrupcoes, gps_pontos, vel_max_kmh, vel_media_kmh)
+  on public.trips to authenticated;
+
+-- Trilha da viagem: o motorista grava a da própria viagem enquanto ela está em andamento;
+-- ele e o ADM podem ver. Depois de finalizada, ninguém altera.
+drop policy if exists "ve trilha propria ou admin" on public.trip_trilhas;
+create policy "ve trilha propria ou admin" on public.trip_trilhas
+  for select using (
+    public.is_admin() or exists (select 1 from public.trips t where t.id = trip_id and t.user_id = auth.uid())
+  );
+drop policy if exists "grava trilha propria" on public.trip_trilhas;
+create policy "grava trilha propria" on public.trip_trilhas
+  for insert to authenticated with check (
+    exists (select 1 from public.trips t where t.id = trip_id and t.user_id = auth.uid() and t.status = 'em_andamento')
+  );
+drop policy if exists "atualiza trilha propria" on public.trip_trilhas;
+create policy "atualiza trilha propria" on public.trip_trilhas
+  for update to authenticated
+  using (exists (select 1 from public.trips t where t.id = trip_id and t.user_id = auth.uid() and t.status = 'em_andamento'))
+  with check (exists (select 1 from public.trips t where t.id = trip_id and t.user_id = auth.uid() and t.status = 'em_andamento'));
 
 -- Manutenções: quem usa o carro vê e registra; só ADM exclui
 drop policy if exists "logado ve manutencoes" on public.maintenances;

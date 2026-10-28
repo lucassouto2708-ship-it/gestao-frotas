@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
-import { Camera, ClipboardList, Route } from "lucide-react";
+import Link from "next/link";
+import { Camera, ClipboardList, MapPinned, Route } from "lucide-react";
 import { FormManutencao } from "@/components/manutencao/FormManutencao";
 import { HistoricoManutencao, type ManutencaoComUsuario } from "@/components/manutencao/HistoricoManutencao";
 import { StatusManutencao } from "@/components/manutencao/StatusManutencao";
 import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
-import { PNEUS, dataHora, formatarPlaca, km, nivelPneu } from "@/lib/regras";
+import { PNEUS, compararDistancias, dataHora, formatarPlaca, km, kmGps, nivelPneu } from "@/lib/regras";
 import { requireAdmin } from "@/lib/supabase/server";
 import type { Profile, TireMeasurement, Trip, Vehicle, VehicleUser } from "@/lib/types";
 import { FormConfigVeiculo } from "./Formularios";
@@ -128,6 +129,7 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
                       <th className="num">Km inicial</th>
                       <th className="num">Km final</th>
                       <th className="num">Percorrido</th>
+                      <th>GPS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -141,6 +143,24 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
                           {t.km_fim !== null ? <>{km(t.km_fim)}<Foto caminho={t.foto_fim} rotulo="foto da chegada" /></> : <Selo nivel="info">Em andamento</Selo>}
                         </td>
                         <td className="num font-semibold">{t.km_fim !== null ? km(t.km_fim - t.km_inicio) : "—"}</td>
+                        <td className="whitespace-nowrap text-xs">
+                          {t.gps_distancia_m != null ? (
+                            (() => {
+                              const c = t.km_fim !== null ? compararDistancias(t.km_fim - t.km_inicio, t.gps_distancia_m, t.gps_cobertura) : null;
+                              return (
+                                <span className="flex items-center gap-1.5">
+                                  <span className="tabular-nums">{kmGps(t.gps_distancia_m)} · {t.gps_cobertura}%</span>
+                                  {c && c.nivel !== "sem_dados" && <Selo nivel={c.nivel}>{c.nivel === "ok" ? "Confere" : "Divergência"}</Selo>}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-texto-2">sem GPS</span>
+                          )}
+                          <Link href={`/admin/viagens/${t.id}`} className="link inline-flex items-center gap-1">
+                            <MapPinned size={13} /> Detalhes e rota
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

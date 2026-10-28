@@ -46,6 +46,18 @@ export type Trip = {
   foto_fim: string | null;
   finalizada_em: string | null;
   status: "em_andamento" | "finalizada";
+  gps_distancia_m: number | null;
+  gps_cobertura: number | null;
+  gps_interrupcoes: number | null;
+  gps_pontos: number | null;
+  vel_max_kmh: number | null;
+  vel_media_kmh: number | null;
+};
+
+export type TripTrilha = {
+  trip_id: string;
+  /** [latitude, longitude, segundos desde o início] */
+  pontos: [number, number, number][];
 };
 
 export type TipoManutencao = "oleo" | "revisao" | "pneus" | "freios" | "bateria" | "outro";

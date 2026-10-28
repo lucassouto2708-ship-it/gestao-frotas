@@ -7,12 +7,15 @@ import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
 import { AvisoManutencao } from "@/components/manutencao/AvisoManutencao";
-import { dataHora, formatarPlaca, km, pendencias } from "@/lib/regras";
+import { useRastreio } from "@/components/rastreio/RastreioProvider";
+import { ConferenciaGps } from "@/components/rastreio/ConferenciaGps";
+import { compararDistancias, dataHora, formatarPlaca, km, pendencias } from "@/lib/regras";
 import { createClient } from "@/lib/supabase/client";
 import type { Trip, Vehicle } from "@/lib/types";
 
 export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Vehicle } }) {
   const router = useRouter();
+  const rastreio = useRastreio();
   const [kmTexto, setKmTexto] = useState("");
   const [foto, setFoto] = useState<Blob | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -21,6 +24,9 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Vehicle }
   const rodado = kmFim !== null && kmFim >= viagem.km_inicio ? kmFim - viagem.km_inicio : null;
   // Com o km de chegada, o carro passa do limite de troca de óleo / revisão?
   const aviso = rodado !== null ? pendencias(viagem.vehicles, kmFim!) : [];
+  // Rastreio por GPS deste aparelho (null se a viagem não foi rastreada aqui)
+  const gps = rastreio.resumo(viagem.id);
+  const comparacao = rodado !== null ? compararDistancias(rodado, gps?.distanciaM ?? null, gps?.cobertura ?? null) : null;
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -34,11 +40,29 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Vehicle }
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const caminho = await enviarFoto(supabase, user!.id, foto, `viagem-fim-${viagem.vehicles.placa}`);
-      const { error } = await supabase
-        .from("trips")
-        .update({ km_fim: kmFim, foto_fim: caminho, finalizada_em: new Date().toISOString(), status: "finalizada" })
-        .eq("id", viagem.id);
+      // Números finais do GPS, calculados no momento de salvar
+      const final = rastreio.resumo(viagem.id);
+      if (final && final.trilha.length > 1) {
+        // A trilha é gravada antes de finalizar (depois disso o banco não deixa mais alterar).
+        // Se falhar, a viagem é finalizada do mesmo jeito: o rastreio nunca pode impedir o registro.
+        await supabase.from("trip_trilhas").upsert({ trip_id: viagem.id, pontos: final.trilha });
+      }
+      const base = { km_fim: kmFim, foto_fim: caminho, finalizada_em: new Date().toISOString(), status: "finalizada" };
+      const dadosGps = final
+        ? {
+            gps_distancia_m: final.distanciaM,
+            gps_cobertura: final.cobertura,
+            gps_interrupcoes: Math.min(final.interrupcoes, 32000),
+            gps_pontos: final.pontos,
+            vel_max_kmh: Math.min(final.velMaxKmh, 399),
+            vel_media_kmh: Math.min(final.velMediaKmh, 399),
+          }
+        : {};
+      let { error } = await supabase.from("trips").update({ ...base, ...dadosGps }).eq("id", viagem.id);
+      // Banco ainda sem as colunas do GPS (banco.sql não atualizado): finaliza sem os dados do GPS
+      if (error && final) ({ error } = await supabase.from("trips").update(base).eq("id", viagem.id));
       if (error) throw new Error(error.message);
+      rastreio.encerrar();
       router.push(`/?finalizada=${viagem.id}`);
       router.refresh();
     } catch (err) {
@@ -82,6 +106,7 @@ export function FormFinalizar({ viagem }: { viagem: Trip & { vehicles: Vehicle }
             <span className="text-[16px] font-semibold tabular-nums">{km(rodado)}</span>
           </div>
         )}
+        {comparacao && <ConferenciaGps comparacao={comparacao} odometroKm={rodado!} gps={gps} />}
         <AvisoManutencao
           veiculoId={viagem.vehicle_id}
           placa={viagem.vehicles.placa}
