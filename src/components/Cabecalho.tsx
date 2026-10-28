@@ -20,6 +20,9 @@ export function Cabecalho({ profile, orgNome }: { profile: Profile; orgNome: str
               <span className="hidden truncate text-[11.5px] opacity-75 sm:block">
                 {orgNome ?? "Controle de quilometragem, manutenção e pneus"}
               </span>
+              <span className="block truncate text-[11.5px] opacity-80 sm:hidden">
+                {orgNome ? `${orgNome} · ` : ""}{ROTULO_PAPEL[profile.role]}
+              </span>
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-1 text-[13px]">

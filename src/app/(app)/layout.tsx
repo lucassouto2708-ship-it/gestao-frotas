@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { RotulosTabela } from "@/components/RotulosTabela";
 import { Cabecalho } from "@/components/Cabecalho";
 import { RastreioProvider } from "@/components/rastreio/RastreioProvider";
 import { Pagina, Painel } from "@/components/Pagina";
@@ -48,6 +49,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <RastreioProvider userId={profile.id}>
       <Cabecalho profile={profile} orgNome={org?.nome ?? null} />
       {children}
+      <div className="h-20 md:hidden" aria-hidden />
+      <RotulosTabela />
     </RastreioProvider>
   );
 }

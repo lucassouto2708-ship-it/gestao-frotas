@@ -100,7 +100,7 @@ export default async function PainelAdmin({ searchParams }: { searchParams: Prom
           <label htmlFor="mes" className="flex items-center gap-1.5 text-[13px] font-medium text-texto-2">
             <CalendarDays size={15} /> Competência
           </label>
-          <input id="mes" name="mes" type="month" defaultValue={mes} className="campo w-40" />
+          <input id="mes" name="mes" type="month" defaultValue={mes} className="campo w-48" />
           <button className="botao-secundario">Aplicar</button>
         </form>
       }

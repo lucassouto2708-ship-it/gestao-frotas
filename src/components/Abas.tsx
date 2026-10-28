@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CarFront, ClipboardList, Gauge, LayoutList, PlusSquare, SlidersHorizontal, Users, Wrench } from "lucide-react";
+import { Building2, CarFront, Ellipsis, X, ClipboardList, Gauge, LayoutList, PlusSquare, SlidersHorizontal, Users, Wrench } from "lucide-react";
 import type { Role } from "@/lib/types";
 
 const ABAS_MOTORISTA = [
@@ -52,8 +53,71 @@ export function Abas({ papel }: { papel: Role }) {
     );
   };
 
+  // Celular: barra fixa embaixo com o essencial; o resto fica em "Mais"
+  const [maisAberto, setMaisAberto] = useState(false);
+  type Aba = { href: string; rotulo: string; icone: typeof Gauge; exato?: boolean };
+  const todas: Aba[] = [...(papel === "admin" ? [ABA_ORGANIZACOES] : []), ...(papel !== "motorista" ? ABAS_PAINEL : []), ...(papel === "motorista" ? ABAS_MOTORISTA : ABAS_GESTAO)];
+  const principais = papel === "motorista" ? ABAS_MOTORISTA : [ABAS_GESTAO[0], ABAS_GESTAO[1], ABAS_GESTAO[2], ABAS_PAINEL[0]];
+  const secundarias = todas.filter((a) => !principais.some((p) => p.href === a.href));
+  const itemBaixo = (a: { href: string; rotulo: string; icone: typeof Gauge; exato?: boolean }) => {
+    const on = ativa(a.href, a.exato);
+    const Icone = a.icone;
+    return (
+      <Link
+        key={a.href}
+        href={a.href}
+        aria-current={on ? "page" : undefined}
+        className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-medium ${on ? "text-primaria-texto" : "text-texto-2"}`}
+      >
+        <Icone size={22} strokeWidth={on ? 2.1 : 1.75} />
+        <span className="max-w-full truncate">{a.rotulo.replace("Veículos e manutenção", "Veículos").replace("Iniciar viagem", "Viagem").replace("Painel da frota", "Painel")}</span>
+      </Link>
+    );
+  };
+
   return (
-    <nav className="border-b border-borda bg-superficie">
+    <>
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-borda bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Navegação principal">
+      <div className="mx-auto flex max-w-xl items-stretch">
+        {principais.map(itemBaixo)}
+        {secundarias.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMaisAberto(true)}
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-medium ${secundarias.some((a) => ativa(a.href, a.exato)) ? "text-primaria-texto" : "text-texto-2"}`}
+          >
+            <Ellipsis size={22} strokeWidth={1.75} />
+            Mais
+          </button>
+        )}
+      </div>
+    </nav>
+    {maisAberto && (
+      <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Mais opções">
+        <button type="button" className="absolute inset-0 bg-black/45" aria-label="Fechar" onClick={() => setMaisAberto(false)} />
+        <div className="absolute inset-x-0 bottom-0 rounded-t-xl border-t border-borda bg-superficie pb-[env(safe-area-inset-bottom)] shadow-2xl">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1">
+            <span className="text-[13px] font-semibold">Mais opções</span>
+            <button type="button" onClick={() => setMaisAberto(false)} className="flex h-9 w-9 items-center justify-center rounded text-texto-2" aria-label="Fechar">
+              <X size={18} />
+            </button>
+          </div>
+          <ul className="divide-y divide-borda pb-2">
+            {secundarias.map((a) => {
+              const Icone = a.icone;
+              return (
+                <li key={a.href}>
+                  <Link href={a.href} onClick={() => setMaisAberto(false)} className={`flex h-12 items-center gap-3 px-4 text-[14px] font-medium ${ativa(a.href, a.exato) ? "text-primaria-texto" : ""}`}>
+                    <Icone size={18} strokeWidth={1.75} /> {a.rotulo}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    )}
+    <nav className="hidden border-b border-borda bg-superficie md:block">
       <div className="mx-auto flex max-w-[1400px] items-stretch overflow-x-auto px-2 sm:px-4">
         {papel !== "motorista" && (
           <>
@@ -65,5 +129,6 @@ export function Abas({ papel }: { papel: Role }) {
         {(papel === "motorista" ? ABAS_MOTORISTA : ABAS_GESTAO).map(item)}
       </div>
     </nav>
+    </>
   );
 }

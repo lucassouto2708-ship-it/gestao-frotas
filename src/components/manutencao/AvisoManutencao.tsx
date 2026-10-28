@@ -41,7 +41,7 @@ export function AvisoManutencao({
           </ul>
         </div>
         {!semBotao && (
-          <Link href={`/veiculos/${veiculoId}#registrar`} className="botao-secundario botao-pequeno self-center">
+          <Link href={`/veiculos/${veiculoId}#registrar`} className="botao-secundario botao-pequeno w-full self-center sm:w-auto">
             <Wrench size={13} /> Registrar manutenção
           </Link>
         )}
