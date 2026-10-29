@@ -26,6 +26,8 @@ export type EstadoRastreio = {
   fixesDescartados: number;
   trilha: Ponto[];
   ultimoPontoTs: number;
+  /** Leituras seguidas consideradas "parado" (sem deslocamento da referência). */
+  paradasSeguidas?: number;
 };
 
 export type ResumoRastreio = {
@@ -58,6 +60,8 @@ const LIMIAR_FATOR_PRECISAO = 3;
 const VEL_MIN_MEDIA = 0.5;
 /** Em movimento, só soma a distância a cada passo mínimo: pontos próximos demais amplificam o ruído do GPS. */
 const PASSO_MIN_M = 15;
+/** Leituras seguidas paradas (sem sair do lugar) para a referência passar a acompanhar o aparelho. */
+const PARADAS_PARA_ACOMPANHAR = 5;
 /** Um ponto da trilha a cada X ms, no máximo. */
 const TRILHA_INTERVALO_MS = 5_000;
 const TRILHA_MAX_PONTOS = 6_000;
@@ -143,18 +147,24 @@ export function processarFix(e: EstadoRastreio, f: Fix): Resultado {
   const d = haversine(e.ancora, f);
   const temVelocidade = f.speed !== null && Number.isFinite(f.speed) && f.speed >= 0;
   const dtAncora = (f.ts - e.ancora.ts) / 1000;
-  const emMovimento = temVelocidade
-    ? // A velocidade do GPS (efeito Doppler) é bem mais confiável que a posição para saber se está parado.
-      // Um deslocamento grande vale mesmo com velocidade ~0 (o sensor pode falhar).
-      f.speed! >= VEL_MIN_MOVIMENTO || d > Math.max(60, 4 * f.acc)
-    : d >= Math.max(LIMIAR_MIN_M, LIMIAR_FATOR_PRECISAO * Math.max(f.acc, e.ancora.acc)) && d / dtAncora >= VEL_MIN_MEDIA;
+  // Velocidade informada pelo GPS (Doppler) confirma movimento, mas a ausência de velocidade NÃO prova que
+  // está parado: alguns aparelhos informam 0 com o carro andando. Por isso o deslocamento a partir da
+  // referência também vale, desde que maior que o ruído do GPS e numa velocidade média plausível.
+  // Se o aparelho diz "parado" (velocidade ~0), pede-se um deslocamento maior para contradizê-lo.
+  const dizParado = temVelocidade && f.speed! < VEL_MIN_MOVIMENTO;
+  const limiar = dizParado ? Math.max(60, 4 * f.acc) : Math.max(LIMIAR_MIN_M, LIMIAR_FATOR_PRECISAO * Math.max(f.acc, e.ancora.acc));
+  const deslocou = d >= limiar && d / dtAncora >= VEL_MIN_MEDIA;
+  const emMovimento = (temVelocidade && f.speed! >= VEL_MIN_MOVIMENTO) || deslocou;
 
   if (!emMovimento) {
-    // Com velocidade, a referência acompanha o aparelho parado (sem somar distância), assim o
-    // próximo movimento começa de onde ele realmente está. Sem velocidade, a referência fica fixa.
-    if (temVelocidade) e.ancora = novaAncora;
+    // A referência só acompanha o aparelho depois de várias leituras seguidas realmente paradas (sem sair do
+    // lugar). Se acompanhasse sempre, um aparelho que informa velocidade 0 com o carro andando nunca somaria
+    // distância, pois o deslocamento de cada leitura isolada ficaria sempre abaixo do ruído.
+    e.paradasSeguidas = d < f.acc ? (e.paradasSeguidas ?? 0) + 1 : 0;
+    if (temVelocidade && (e.paradasSeguidas ?? 0) >= PARADAS_PARA_ACOMPANHAR) e.ancora = novaAncora;
     return "parado";
   }
+  e.paradasSeguidas = 0;
   // Em movimento, mas ainda perto da referência: espera juntar um passo (a referência não muda, nada se perde)
   if (d < Math.max(PASSO_MIN_M, f.acc)) return "parado";
 
