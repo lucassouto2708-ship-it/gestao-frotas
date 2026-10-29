@@ -149,7 +149,11 @@ export function FormPneus({ veiculos }: { veiculos: Vehicle[] }) {
 }
 
 function Diagrama({ valores }: { valores: Record<Campo, string> }) {
-  const n = (c: Campo) => paraNumero(valores[c], "pneu");
+  // Sulco de pneu vai de 0 a ~20 mm: valor maior (ex.: "127" sem a vírgula) não entra no mostrador
+  const n = (c: Campo) => {
+    const v = paraNumero(valores[c], "pneu");
+    return v !== null && v >= 0 && v <= 20 ? v : null;
+  };
   return (
     <DiagramaPneus
       medidas={{

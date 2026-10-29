@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, CarFront, Ellipsis, X, ClipboardList, Gauge, LayoutList, PlusSquare, SlidersHorizontal, Users, Wrench } from "lucide-react";
@@ -55,6 +55,19 @@ export function Abas({ papel }: { papel: Role }) {
 
   // Celular: barra fixa embaixo com o essencial; o resto fica em "Mais"
   const [maisAberto, setMaisAberto] = useState(false);
+  // Com o teclado aberto a tela útil encolhe: a barra fixa cobriria o campo que está sendo digitado
+  const [digitando, setDigitando] = useState(false);
+  useEffect(() => {
+    const campo = (el: EventTarget | null) => el instanceof HTMLElement && (el.matches("input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select") || el.isContentEditable);
+    const entrou = (e: FocusEvent) => campo(e.target) && setDigitando(true);
+    const saiu = () => setDigitando(false);
+    document.addEventListener("focusin", entrou);
+    document.addEventListener("focusout", saiu);
+    return () => {
+      document.removeEventListener("focusin", entrou);
+      document.removeEventListener("focusout", saiu);
+    };
+  }, []);
   type Aba = { href: string; rotulo: string; icone: typeof Gauge; exato?: boolean };
   const todas: Aba[] = [...(papel === "admin" ? [ABA_ORGANIZACOES] : []), ...(papel !== "motorista" ? ABAS_PAINEL : []), ...(papel === "motorista" ? ABAS_MOTORISTA : ABAS_GESTAO)];
   const principais = papel === "motorista" ? ABAS_MOTORISTA : [ABAS_GESTAO[0], ABAS_GESTAO[1], ABAS_GESTAO[2], ABAS_PAINEL[0]];
@@ -77,7 +90,7 @@ export function Abas({ papel }: { papel: Role }) {
 
   return (
     <>
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-borda bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Navegação principal">
+    <nav className={`fixed inset-x-0 bottom-0 z-30 border-t border-borda bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden ${digitando ? "hidden" : ""}`} aria-label="Navegação principal">
       <div className="mx-auto flex max-w-xl items-stretch">
         {principais.map(itemBaixo)}
         {secundarias.length > 0 && (
