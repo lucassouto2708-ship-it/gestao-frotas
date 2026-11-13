@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Vehicle } from "@/lib/types";
+import { CNH_EXIGIDA } from "@/lib/regras";
+import type { CnhExigida, Vehicle } from "@/lib/types";
 
 export function FormConfigVeiculo({ veiculo }: { veiculo: Vehicle }) {
   const router = useRouter();
   const [modelo, setModelo] = useState(veiculo.modelo);
+  const [cnh, setCnh] = useState<CnhExigida | "">(veiculo.cnh_exigida ?? "");
   const [oleo, setOleo] = useState(String(veiculo.intervalo_oleo));
   const [revisao, setRevisao] = useState(String(veiculo.intervalo_revisao));
   const [kmAtual, setKmAtual] = useState(String(veiculo.km_atual));
@@ -21,6 +23,7 @@ export function FormConfigVeiculo({ veiculo }: { veiculo: Vehicle }) {
       .from("vehicles")
       .update({
         modelo,
+        cnh_exigida: cnh || null,
         intervalo_oleo: Number(oleo),
         intervalo_revisao: Number(revisao),
         km_atual: Number(kmAtual.replace(/\D/g, "")),
@@ -44,6 +47,15 @@ export function FormConfigVeiculo({ veiculo }: { veiculo: Vehicle }) {
       <label className="block">
         <span className="rotulo">Modelo</span>
         <input className="campo" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+      </label>
+      <label className="block">
+        <span className="rotulo">CNH exigida</span>
+        <select className="campo" value={cnh} onChange={(e) => setCnh(e.target.value as CnhExigida | "")}>
+          <option value="">Sem exigência (qualquer motorista)</option>
+          {CNH_EXIGIDA.map((c) => (
+            <option key={c.valor} value={c.valor}>Categoria {c.valor}: {c.descricao}</option>
+          ))}
+        </select>
       </label>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">

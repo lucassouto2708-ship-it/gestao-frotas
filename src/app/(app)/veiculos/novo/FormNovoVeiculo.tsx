@@ -7,14 +7,16 @@ import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { Pagina } from "@/components/Pagina";
 import { enviarFoto } from "@/lib/imagem";
-import { hojeISO, km, normalizarPlaca, placaValida } from "@/lib/regras";
+import { CNH_EXIGIDA, hojeISO, km, normalizarPlaca, placaValida } from "@/lib/regras";
 import { createClient } from "@/lib/supabase/client";
+import type { CnhExigida } from "@/lib/types";
 
 export function FormNovoVeiculo({ organizacoes, organizacaoId }: { organizacoes: { id: string; nome: string }[]; organizacaoId: string | null }) {
   const router = useRouter();
   const [org, setOrg] = useState(organizacaoId ?? organizacoes[0]?.id ?? "");
   const [placa, setPlaca] = useState("");
   const [modelo, setModelo] = useState("");
+  const [cnh, setCnh] = useState<CnhExigida>("B");
   const [kmTexto, setKmTexto] = useState("");
   const [foto, setFoto] = useState<Blob | null>(null);
   const [anterior, setAnterior] = useState({ oleoKm: "", oleoData: "", revisaoKm: "", revisaoData: "" });
@@ -55,6 +57,7 @@ export function FormNovoVeiculo({ organizacoes, organizacaoId }: { organizacoes:
           organizacao_id: org,
           placa: normalizarPlaca(placa),
           modelo,
+          cnh_exigida: cnh,
           km_inicial: kmInicial,
           km_atual: kmInicial,
           foto_km_inicial: caminho,
@@ -107,6 +110,19 @@ export function FormNovoVeiculo({ organizacoes, organizacaoId }: { organizacoes:
           <div>
             <label className="rotulo" htmlFor="modelo">Modelo</label>
             <input id="modelo" className="campo" placeholder="Ex.: Fiat Strada 2023" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="rotulo" htmlFor="cnh">CNH exigida <span className="text-perigo">*</span></label>
+            <select id="cnh" className="campo" value={cnh} onChange={(e) => setCnh(e.target.value as CnhExigida)} required>
+              {CNH_EXIGIDA.map((c) => (
+                <option key={c.valor} value={c.valor}>Categoria {c.valor}: {c.descricao}</option>
+              ))}
+            </select>
+            <p className="ajuda">
+              {cnh === "A"
+                ? "Só quem tem a categoria A na CNH consegue iniciar viagem neste veículo."
+                : `Só quem tem CNH ${cnh}${cnh === "E" ? "" : " ou superior"} consegue iniciar viagem neste veículo.`}
+            </p>
           </div>
           <div className="sm:col-span-2">
             <FotoNumero rotulo="Quilometragem atual do odômetro" modo="odometro" unidade="km" valor={kmTexto} onValor={setKmTexto} onFoto={setFoto} />

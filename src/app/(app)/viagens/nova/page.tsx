@@ -17,7 +17,12 @@ export default async function NovaViagem() {
   return (
     <Pagina titulo="Iniciar viagem" descricao="Registre a saída do veículo com a foto do odômetro." voltar="/">
       {veiculos?.length ? (
-        <FormNovaViagem veiculos={veiculos as Vehicle[]} emUso={[...emUso]} />
+        <FormNovaViagem
+          veiculos={veiculos as Vehicle[]}
+          emUso={[...emUso]}
+          // O ADM não é conferido; os demais só dirigem o que a CNH permite
+          cnh={profile.role === "admin" ? undefined : profile.cnh_categoria ?? null}
+        />
       ) : (
         <Painel className="max-w-2xl">
           <EstadoVazio

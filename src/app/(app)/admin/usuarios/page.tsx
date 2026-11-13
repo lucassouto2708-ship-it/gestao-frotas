@@ -4,7 +4,7 @@ import { Selo } from "@/components/Selo";
 import { dataHora, formatarPlaca } from "@/lib/regras";
 import { requireGestor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type Convite, type Organizacao, type Profile, type Vehicle, type VehicleUser } from "@/lib/types";
-import { AtribuirUsuario, BotaoAtivo, BotaoPapel } from "./BotaoPapel";
+import { AtribuirUsuario, BotaoAtivo, BotaoPapel, SeletorCnh } from "./BotaoPapel";
 import { LinhaConvite, NovoConvite } from "./Convites";
 
 export default async function Usuarios({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
@@ -39,7 +39,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
   return (
     <Pagina
       titulo="Usuários"
-      descricao="Convide pessoas para a organização com um link, defina quem é gestor ou motorista e vincule cada motorista aos carros dele na ficha do veículo."
+      descricao="Convide pessoas para a organização com um link, defina quem é gestor ou motorista, informe a categoria da CNH de cada um e vincule cada motorista aos carros dele na ficha do veículo."
       acoes={
         admin && (
           <form className="flex items-center gap-2">
@@ -119,6 +119,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
                   {admin && <th>Organização</th>}
                   <th>Cadastro</th>
                   <th>Papel</th>
+                  <th>CNH</th>
                   <th>Veículos vinculados</th>
                   <th className="num">Ações</th>
                 </tr>
@@ -134,6 +135,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
                     {admin && <td>{nomeOrg.get(u.organizacao_id!) ?? "—"}</td>}
                     <td className="whitespace-nowrap">{dataHora(u.created_at)}</td>
                     <td>{u.role === "gestor" ? <Selo nivel="info">{ROTULO_PAPEL.gestor}</Selo> : <Selo nivel="neutro">{ROTULO_PAPEL.motorista}</Selo>}</td>
+                    <td><SeletorCnh id={u.id} cnh={u.cnh_categoria ?? null} nome={u.nome || u.email || "esta pessoa"} /></td>
                     <td>
                       {u.role === "gestor" ? (
                         <span className="text-xs text-texto-2">Todos da organização</span>
@@ -163,7 +165,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
                 ))}
                 {usuarios.length === 0 && (
                   <tr>
-                    <td colSpan={admin ? 7 : 6} className="py-6 text-center text-texto-2">
+                    <td colSpan={admin ? 8 : 7} className="py-6 text-center text-texto-2">
                       Ninguém ainda. Gere um convite acima e envie o link.
                     </td>
                   </tr>

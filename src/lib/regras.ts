@@ -1,4 +1,4 @@
-import type { TipoManutencao, TireMeasurement, Vehicle } from "@/lib/types";
+import type { CategoriaCnh, CnhExigida, TipoManutencao, TireMeasurement, Vehicle } from "@/lib/types";
 
 /** A partir de quanto do intervalo o aviso "em breve" aparece. */
 export const AVISO_PERCENTUAL = 0.9;
@@ -160,3 +160,34 @@ export function duracao(ms: number) {
 
 /** 12400 m -> "12,4 km" */
 export const kmGps = (m: number) => `${km1(m / 1000)} km`;
+
+// ---------------------------------------------------------------------
+// CNH (a mesma regra é conferida no banco ao iniciar a viagem)
+// ---------------------------------------------------------------------
+export const CATEGORIAS_CNH: CategoriaCnh[] = ["A", "B", "AB", "C", "AC", "D", "AD", "E", "AE"];
+
+export const CNH_EXIGIDA: { valor: CnhExigida; descricao: string }[] = [
+  { valor: "A", descricao: "Motos e motonetas" },
+  { valor: "B", descricao: "Carros, utilitários e caminhonetes (até 3.500 kg e 8 passageiros)" },
+  { valor: "C", descricao: "Caminhões (acima de 3.500 kg)" },
+  { valor: "D", descricao: "Vans, micro-ônibus e ônibus (mais de 8 passageiros)" },
+  { valor: "E", descricao: "Carretas e combinações (reboque acima de 6.000 kg)" },
+];
+
+const QUATRO_RODAS = "BCDE";
+
+/**
+ * A CNH permite dirigir o veículo? A carteira de moto (A) é à parte; nas de quatro rodas
+ * cada categoria inclui as anteriores (E > D > C > B). Veículo sem exigência: qualquer um.
+ */
+export function cnhHabilita(cnh: CategoriaCnh | null | undefined, exigida: CnhExigida | null | undefined): boolean {
+  if (!exigida) return true;
+  if (!cnh) return false;
+  if (exigida === "A") return cnh.includes("A");
+  return QUATRO_RODAS.indexOf(cnh.slice(-1)) >= QUATRO_RODAS.indexOf(exigida);
+}
+
+/** Texto curto da exigência: "C ou superior", "A". */
+export function rotuloExigida(exigida: CnhExigida) {
+  return exigida === "A" || exigida === "E" ? exigida : `${exigida} ou superior`;
+}

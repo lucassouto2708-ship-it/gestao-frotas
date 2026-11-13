@@ -6,16 +6,19 @@ import { Gauge, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FotoNumero, paraNumero } from "@/components/FotoNumero";
 import { enviarFoto } from "@/lib/imagem";
-import { formatarPlaca, km } from "@/lib/regras";
+import { cnhHabilita, formatarPlaca, km, rotuloExigida } from "@/lib/regras";
 import { useRastreio } from "@/components/rastreio/RastreioProvider";
 import { createClient } from "@/lib/supabase/client";
-import type { Vehicle } from "@/lib/types";
+import type { CategoriaCnh, Vehicle } from "@/lib/types";
 
-export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso: string[] }) {
+/** cnh: categoria de quem vai dirigir (null = não informada; undefined = não conferir, caso do ADM). */
+export function FormNovaViagem({ veiculos, emUso, cnh }: { veiculos: Vehicle[]; emUso: string[]; cnh: CategoriaCnh | null | undefined }) {
   const router = useRouter();
   const rastreio = useRastreio();
+  const habilitado = (v: Vehicle) => cnh === undefined || cnhHabilita(cnh, v.cnh_exigida);
+  const bloqueados = veiculos.filter((v) => !habilitado(v));
   // Só um carro disponível para o usuário: já vem selecionado
-  const livres = veiculos.filter((v) => !emUso.includes(v.id));
+  const livres = veiculos.filter((v) => !emUso.includes(v.id) && habilitado(v));
   const [veiculoId, setVeiculoId] = useState(livres.length === 1 ? livres[0].id : "");
   const [destino, setDestino] = useState("");
   const [kmTexto, setKmTexto] = useState("");
@@ -29,6 +32,8 @@ export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso
     setErro(null);
     const kmInicio = paraNumero(kmTexto, "odometro");
     if (!veiculo) return setErro("Escolha o carro.");
+    if (!habilitado(veiculo))
+      return setErro(`Sua CNH não permite dirigir este veículo: ele exige categoria ${rotuloExigida(veiculo.cnh_exigida!)}.`);
     if (!foto) return setErro("Tire a foto do mostrador no início da viagem.");
     if (kmInicio === null) return setErro("Informe o km do mostrador.");
     if (kmInicio < veiculo.km_atual)
@@ -71,12 +76,20 @@ export function FormNovaViagem({ veiculos, emUso }: { veiculos: Vehicle[]; emUso
           <select id="veiculo" className="campo" value={veiculoId} onChange={(e) => setVeiculoId(e.target.value)} required>
             <option value="">Selecione…</option>
             {veiculos.map((v) => (
-              <option key={v.id} value={v.id} disabled={emUso.includes(v.id)}>
-                {formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`} {emUso.includes(v.id) ? "(em viagem)" : ""}
+              <option key={v.id} value={v.id} disabled={emUso.includes(v.id) || !habilitado(v)}>
+                {formatarPlaca(v.placa)} {v.modelo && `· ${v.modelo}`}{" "}
+                {!habilitado(v) ? `(exige CNH ${rotuloExigida(v.cnh_exigida!)})` : emUso.includes(v.id) ? "(em viagem)" : ""}
               </option>
             ))}
           </select>
           {veiculo && <p className="ajuda">Último km registrado: <b className="tabular-nums">{km(veiculo.km_atual)}</b></p>}
+          {bloqueados.length > 0 && (
+            <p className="ajuda text-alerta">
+              {cnh
+                ? `Sua CNH é categoria ${cnh}. ${bloqueados.length === 1 ? "Um veículo exige" : `${bloqueados.length} veículos exigem`} outra categoria e não pode${bloqueados.length === 1 ? "" : "m"} ser usado${bloqueados.length === 1 ? "" : "s"}.`
+                : "Sua CNH não está cadastrada, por isso os veículos que exigem categoria ficam bloqueados. Peça ao gestor para informá-la."}
+            </p>
+          )}
         </div>
         <div>
           <label className="rotulo" htmlFor="destino">Destino / finalidade</label>

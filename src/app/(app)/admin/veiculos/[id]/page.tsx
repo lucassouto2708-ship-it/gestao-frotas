@@ -8,7 +8,7 @@ import { EstadoVazio, Pagina, Painel } from "@/components/Pagina";
 import { Selo } from "@/components/Selo";
 import { linksDasFotos } from "@/lib/fotos";
 import { BotaoPdf } from "@/components/BotaoPdf";
-import { PNEUS, compararDistancias, dataHora, formatarPlaca, km, kmGps, nivelPneu } from "@/lib/regras";
+import { PNEUS, compararDistancias, dataHora, formatarPlaca, km, kmGps, nivelPneu, rotuloExigida } from "@/lib/regras";
 import { requireGestor } from "@/lib/supabase/server";
 import type { Relatorio } from "@/lib/pdf";
 import type { Profile, TireMeasurement, Trip, Vehicle, VehicleUser } from "@/lib/types";
@@ -27,15 +27,17 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
     supabase.from("maintenances").select("*, profiles(nome, email)").eq("vehicle_id", id).order("realizada_em", { ascending: false }).order("km", { ascending: false }),
     supabase.from("tire_measurements").select("*, profiles(nome, email)").eq("vehicle_id", id).order("created_at", { ascending: false }).limit(10),
     supabase.from("vehicle_users").select("*").eq("vehicle_id", id).order("vinculado_em"),
-    supabase.from("profiles").select("id, nome, email, role, ativo, organizacao_id").order("nome"),
+    supabase.from("profiles").select("id, nome, email, role, ativo, organizacao_id, cnh_categoria").order("nome"),
   ]);
   if (!v) notFound();
   const { data: orgDoVeiculo } = await supabase.from("organizacoes").select("nome").eq("id", v.organizacao_id).maybeSingle();
-  const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role" | "ativo" | "organizacao_id">[];
+  const listaPerfis = (perfis ?? []) as Pick<Profile, "id" | "nome" | "email" | "role" | "ativo" | "organizacao_id" | "cnh_categoria">[];
+  const cnhDe = new Map(listaPerfis.map((p) => [p.id, p.cnh_categoria ?? null]));
   const nomeDe = new Map(listaPerfis.map((p) => [p.id, p.nome || p.email || "—"]));
   const vinculados: Vinculado[] = ((vinculos ?? []) as VehicleUser[]).map((l) => ({
     id: l.user_id,
     nome: nomeDe.get(l.user_id) ?? "—",
+    cnh: cnhDe.get(l.user_id) ?? null,
     vinculadoPor: l.vinculado_por ? nomeDe.get(l.vinculado_por) ?? "—" : null,
     vinculadoEm: l.vinculado_em,
   }));
@@ -103,10 +105,11 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <Painel titulo="Ficha do veículo" semPadding>
-            <dl className="grid grid-cols-2 text-[13px] sm:grid-cols-4">
+            <dl className="grid grid-cols-2 text-[13px] sm:grid-cols-5">
               {[
                 ["Placa", <span key="p" className="mono font-semibold">{formatarPlaca(v.placa)}</span>],
                 ["Modelo", v.modelo || "—"],
+                ["CNH exigida", v.cnh_exigida ? rotuloExigida(v.cnh_exigida) : <span key="c" className="text-texto-2">Sem exigência</span>],
                 ["Km no cadastro", <span key="k" className="tabular-nums">{km(v.km_inicial)}<Foto caminho={v.foto_km_inicial} rotulo="foto do cadastro" /></span>],
                 ["Km atual", <span key="a" className="text-[15px] font-semibold tabular-nums">{km(v.km_atual)}</span>],
               ].map(([rotulo, valor], i) => (
@@ -233,10 +236,11 @@ export default async function DetalheVeiculo({ params }: { params: Promise<{ id:
           >
             <Motoristas
               veiculoId={v.id}
+              cnhExigida={v.cnh_exigida}
               vinculados={vinculados}
               usuarios={listaPerfis
                 .filter((p) => p.role === "motorista" && p.ativo && p.organizacao_id === v.organizacao_id)
-                .map((p) => ({ id: p.id, nome: nomeDe.get(p.id)! }))}
+                .map((p) => ({ id: p.id, nome: nomeDe.get(p.id)!, cnh: p.cnh_categoria ?? null }))}
             />
           </Painel>
 

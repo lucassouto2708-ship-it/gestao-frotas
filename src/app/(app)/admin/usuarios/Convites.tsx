@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Link2, Loader2, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { dataHora } from "@/lib/regras";
-import type { Convite } from "@/lib/types";
+import { CATEGORIAS_CNH, dataHora } from "@/lib/regras";
+import type { CategoriaCnh, Convite } from "@/lib/types";
 
 const linkDoConvite = (codigo: string) => `${window.location.origin}/convite?c=${codigo}`;
 
@@ -15,6 +15,7 @@ export function NovoConvite({ organizacoes, orgFixa }: { organizacoes: { id: str
   const [org, setOrg] = useState(orgFixa ?? organizacoes[0]?.id ?? "");
   const [papel, setPapel] = useState<"motorista" | "gestor">("motorista");
   const [dias, setDias] = useState("7");
+  const [cnh, setCnh] = useState<CategoriaCnh | "">("");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [gerado, setGerado] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function NovoConvite({ organizacoes, orgFixa }: { organizacoes: { id: str
     setGerado(null);
     setCopiado(false);
     setOcupado(true);
-    const { data, error } = await createClient().rpc("criar_convite", { p_org: org, p_papel: papel, p_dias: Number(dias) });
+    const { data, error } = await createClient().rpc("criar_convite", { p_org: org, p_papel: papel, p_dias: Number(dias), p_cnh: cnh || null });
     setOcupado(false);
     if (error) return setErro(error.message);
     setGerado(data as string);
@@ -60,6 +61,15 @@ export function NovoConvite({ organizacoes, orgFixa }: { organizacoes: { id: str
           <select id="convite-papel" className="campo w-40" value={papel} onChange={(e) => setPapel(e.target.value as "motorista" | "gestor")}>
             <option value="motorista">Motorista</option>
             <option value="gestor">Gestor</option>
+          </select>
+        </div>
+        <div>
+          <label className="rotulo" htmlFor="convite-cnh">CNH</label>
+          <select id="convite-cnh" className="campo w-40" value={cnh} onChange={(e) => setCnh(e.target.value as CategoriaCnh | "")}>
+            <option value="">Informar depois</option>
+            {CATEGORIAS_CNH.map((c) => (
+              <option key={c} value={c}>CNH {c}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -97,7 +107,10 @@ export function LinhaConvite({ convite, nomeOrg }: { convite: Convite; nomeOrg?:
     <tr>
       <td className="mono font-semibold">{convite.codigo}</td>
       {nomeOrg !== undefined && <td>{nomeOrg}</td>}
-      <td>{convite.papel === "gestor" ? "Gestor" : "Motorista"}</td>
+      <td>
+        {convite.papel === "gestor" ? "Gestor" : "Motorista"}
+        {convite.cnh_categoria && <span className="text-texto-2"> · CNH {convite.cnh_categoria}</span>}
+      </td>
       <td className="whitespace-nowrap">
         {dataHora(convite.expira_em)} {vencido && <span className="text-perigo">(vencido)</span>}
       </td>

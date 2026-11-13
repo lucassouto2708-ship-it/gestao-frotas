@@ -3,6 +3,7 @@
 Aplicativo web (PWA, funciona no celular e pode ser instalado na tela inicial) para controlar a frota:
 
 - **Cadastro de carros**: placa, modelo e km inicial do mostrador (com foto opcional).
+- **CNH**: cada pessoa tem a categoria da CNH (A, B, AB, C, AC, D, AD, E, AE), informada pelo gestor em *Usuários* ou já no convite. Cada carro tem a categoria mínima exigida (A, B, C, D ou E). Na hora de iniciar a viagem, quem não tem a categoria (ou não tem a CNH cadastrada) não consegue usar o veículo. A categoria A (moto) é à parte; nas de quatro rodas, a maior inclui as menores (E > D > C > B). Carros sem exigência definida continuam liberados para todos.
 - **Viagens**: o motorista tira foto do mostrador na saída e na chegada. O app calcula os km rodados.
 - **Manutenção**: aviso de troca de óleo (padrão a cada **10.000 km**) e revisão (padrão a cada **20.000 km**), com alerta ao atingir 90% do intervalo. No cadastro do carro dá para informar a última troca de óleo e a última revisão. Depois, o gestor registra serviços (óleo, revisão, pneus, freios, bateria, outros) com km, data e custo, e cada carro tem seu **histórico de manutenção**. Troca de óleo e revisão zeram o contador. O gestor e o ADM excluem registros. Os intervalos podem ser alterados por carro.
 - **Pneus (TWI)**: medição do sulco dos 4 pneus (dianteiro/traseiro, esquerdo/direito) com foto do medidor. Abaixo de 1,6 mm (TWI, mínimo legal) aparece "Trocar"; abaixo de 3 mm, "Atenção".

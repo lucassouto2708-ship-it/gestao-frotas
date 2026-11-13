@@ -46,6 +46,11 @@ update public.profiles set role = 'motorista' where role = 'comum';
 alter table public.profiles alter column role set default 'motorista';
 alter table public.profiles add constraint profiles_role_check check (role in ('admin', 'gestor', 'motorista'));
 create index if not exists profiles_org_idx on public.profiles (organizacao_id);
+-- Categoria da CNH (como vem impressa na carteira: A, B, AB, C, AC, D, AD, E, AE). Nula = não informada.
+alter table public.profiles add column if not exists cnh_categoria text;
+alter table public.profiles drop constraint if exists profiles_cnh_check;
+alter table public.profiles add constraint profiles_cnh_check
+  check (cnh_categoria is null or cnh_categoria in ('A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE'));
 
 -- Cria o perfil quando alguém se cadastra. A primeira conta vira ADM; as demais ficam sem
 -- organização até aceitarem um convite.
@@ -178,6 +183,11 @@ create trigger configuracoes_before_update
 -- Atualização de bancos criados antes destas colunas existirem
 alter table public.vehicles add column if not exists data_ultima_troca_oleo date;
 alter table public.vehicles add column if not exists data_ultima_revisao date;
+-- Categoria mínima de CNH para dirigir o veículo. Nula = sem exigência (veículos cadastrados antes).
+alter table public.vehicles add column if not exists cnh_exigida text;
+alter table public.vehicles drop constraint if exists vehicles_cnh_check;
+alter table public.vehicles add constraint vehicles_cnh_check
+  check (cnh_exigida is null or cnh_exigida in ('A', 'B', 'C', 'D', 'E'));
 
 -- No cadastro, o km atual parte do km inicial. A última troca de óleo / revisão
 -- pode ser informada; se não for, conta a partir do km inicial.
@@ -453,8 +463,8 @@ language plpgsql
 as $$
 begin
   if pg_trigger_depth() = 1 and auth.uid() is not null
-     and (new.placa, new.modelo, new.intervalo_oleo, new.intervalo_revisao, new.km_atual)
-         is distinct from (old.placa, old.modelo, old.intervalo_oleo, old.intervalo_revisao, old.km_atual) then
+     and (new.placa, new.modelo, new.intervalo_oleo, new.intervalo_revisao, new.km_atual, new.cnh_exigida)
+         is distinct from (old.placa, old.modelo, old.intervalo_oleo, old.intervalo_revisao, old.km_atual, old.cnh_exigida) then
     new.atualizado_por := auth.uid();
     new.atualizado_em := now();
   end if;
@@ -639,8 +649,14 @@ create table if not exists public.convites (
   usado_em timestamptz
 );
 create index if not exists convites_org_idx on public.convites (organizacao_id);
+-- CNH do motorista convidado (opcional): vai para o perfil quando ele aceita o convite
+alter table public.convites add column if not exists cnh_categoria text;
+alter table public.convites drop constraint if exists convites_cnh_check;
+alter table public.convites add constraint convites_cnh_check
+  check (cnh_categoria is null or cnh_categoria in ('A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE'));
 
-create or replace function public.criar_convite(p_org uuid, p_papel text, p_dias integer default 7)
+drop function if exists public.criar_convite(uuid, text, integer);
+create or replace function public.criar_convite(p_org uuid, p_papel text, p_dias integer default 7, p_cnh text default null)
 returns text
 language plpgsql
 security definer set search_path = public
@@ -652,6 +668,10 @@ begin
   if auth.uid() is null then raise exception 'Faça login.'; end if;
   if p_papel not in ('gestor', 'motorista') then raise exception 'Papel inválido.'; end if;
   if p_dias is null or p_dias < 1 or p_dias > 60 then raise exception 'A validade deve ser de 1 a 60 dias.'; end if;
+  p_cnh := nullif(upper(btrim(coalesce(p_cnh, ''))), '');
+  if p_cnh is not null and p_cnh not in ('A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE') then
+    raise exception 'Categoria de CNH inválida.';
+  end if;
   if not (public.is_admin() or (public.is_gestor() and p_org = public.minha_org())) then
     raise exception 'Sem permissão para convidar nesta organização.';
   end if;
@@ -664,8 +684,8 @@ begin
     tentativas := tentativas + 1;
     if tentativas > 5 then raise exception 'Não foi possível gerar o código. Tente de novo.'; end if;
   end loop;
-  insert into public.convites (codigo, organizacao_id, papel, expira_em)
-  values (novo, p_org, p_papel, now() + make_interval(days => p_dias));
+  insert into public.convites (codigo, organizacao_id, papel, expira_em, cnh_categoria)
+  values (novo, p_org, p_papel, now() + make_interval(days => p_dias), p_cnh);
   return novo;
 end;
 $$;
@@ -692,7 +712,9 @@ begin
   if not exists (select 1 from public.organizacoes where id = c.organizacao_id and ativa) then
     raise exception 'Esta organização está suspensa.';
   end if;
-  update public.profiles set organizacao_id = c.organizacao_id, role = c.papel where id = eu.id;
+  update public.profiles
+     set organizacao_id = c.organizacao_id, role = c.papel, cnh_categoria = coalesce(c.cnh_categoria, cnh_categoria)
+   where id = eu.id;
   update public.convites set usado_por = eu.id, usado_em = now() where id = c.id;
   return query select o.nome, c.papel from public.organizacoes o where o.id = c.organizacao_id;
 end;
@@ -762,16 +784,87 @@ end;
 $$;
 
 -- Estas funções só podem ser chamadas por quem está logado (e cada uma confere o nível de acesso)
-revoke all on function public.criar_convite(uuid, text, integer) from public, anon;
+revoke all on function public.criar_convite(uuid, text, integer, text) from public, anon;
 revoke all on function public.aceitar_convite(text) from public, anon;
 revoke all on function public.definir_papel(uuid, text) from public, anon;
 revoke all on function public.definir_ativo(uuid, boolean) from public, anon;
 revoke all on function public.atribuir_usuario(uuid, uuid, text) from public, anon;
-grant execute on function public.criar_convite(uuid, text, integer) to authenticated;
+grant execute on function public.criar_convite(uuid, text, integer, text) to authenticated;
 grant execute on function public.aceitar_convite(text) to authenticated;
 grant execute on function public.definir_papel(uuid, text) to authenticated;
 grant execute on function public.definir_ativo(uuid, boolean) to authenticated;
 grant execute on function public.atribuir_usuario(uuid, uuid, text) to authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- 5d. CNH (categoria do motorista x categoria exigida pelo veículo)
+-- ---------------------------------------------------------------------
+-- A carteira de moto (A) é independente das de quatro rodas. Nas de quatro rodas,
+-- cada categoria inclui as anteriores: E dirige D, C e B; D dirige C e B; C dirige B.
+create or replace function public.cnh_habilita(p_cnh text, p_exigida text)
+returns boolean
+language sql
+immutable
+as $$
+  select case
+    when p_exigida is null then true
+    when p_cnh is null then false
+    when p_exigida = 'A' then position('A' in p_cnh) > 0
+    else position(right(p_cnh, 1) in 'BCDE') >= position(p_exigida in 'BCDE')
+  end;
+$$;
+
+-- Ao iniciar a viagem, confere se a CNH de quem dirige permite o veículo (o ADM não é conferido)
+create or replace function public.trips_confere_cnh()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  exigida text;
+  cnh text;
+  papel text;
+begin
+  select v.cnh_exigida into exigida from public.vehicles v where v.id = new.vehicle_id;
+  if exigida is null then return new; end if;
+  select p.cnh_categoria, p.role into cnh, papel from public.profiles p where p.id = new.user_id;
+  if papel = 'admin' or public.cnh_habilita(cnh, exigida) then return new; end if;
+  if cnh is null then
+    raise exception 'Este veículo exige CNH categoria %. A sua CNH não está cadastrada: peça ao gestor para informar a categoria.', exigida;
+  end if;
+  raise exception 'Sua CNH (categoria %) não permite dirigir este veículo: ele exige categoria %.', cnh,
+    case when exigida = 'A' then 'A' when exigida = 'E' then 'E' else exigida || ' ou superior' end;
+end;
+$$;
+
+drop trigger if exists trips_confere_cnh on public.trips;
+create trigger trips_confere_cnh before insert on public.trips
+  for each row execute function public.trips_confere_cnh();
+
+-- Gestor informa a CNH das pessoas da própria organização (inclusive a dele). ADM: de qualquer uma.
+create or replace function public.definir_cnh(p_usuario uuid, p_categoria text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  alvo public.profiles;
+  cat text := nullif(upper(btrim(coalesce(p_categoria, ''))), '');
+begin
+  if cat is not null and cat not in ('A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE') then
+    raise exception 'Categoria de CNH inválida.';
+  end if;
+  select * into alvo from public.profiles where id = p_usuario;
+  if not found then raise exception 'Usuário não encontrado.'; end if;
+  if not (public.is_admin() or (public.is_gestor() and alvo.organizacao_id is not null and alvo.organizacao_id = public.minha_org())) then
+    raise exception 'Sem permissão.';
+  end if;
+  update public.profiles set cnh_categoria = cat where id = p_usuario;
+end;
+$$;
+
+revoke all on function public.definir_cnh(uuid, text) from public, anon;
+grant execute on function public.definir_cnh(uuid, text) to authenticated;
 
 
 -- ---------------------------------------------------------------------

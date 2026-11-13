@@ -3,6 +3,11 @@ export type Role = "admin" | "gestor" | "motorista";
 
 export const ROTULO_PAPEL: Record<Role, string> = { admin: "ADM", gestor: "Gestor", motorista: "Motorista" };
 
+/** Categoria impressa na CNH do motorista (moto A combinada ou não com uma de quatro rodas). */
+export type CategoriaCnh = "A" | "B" | "AB" | "C" | "AC" | "D" | "AD" | "E" | "AE";
+/** Categoria mínima exigida para dirigir o veículo. */
+export type CnhExigida = "A" | "B" | "C" | "D" | "E";
+
 export type Profile = {
   id: string;
   nome: string;
@@ -10,6 +15,7 @@ export type Profile = {
   role: Role;
   organizacao_id: string | null;
   ativo: boolean;
+  cnh_categoria: CategoriaCnh | null;
   created_at: string;
 };
 
@@ -27,6 +33,7 @@ export type Convite = {
   codigo: string;
   organizacao_id: string;
   papel: "gestor" | "motorista";
+  cnh_categoria: CategoriaCnh | null;
   criado_por: string | null;
   criado_em: string;
   expira_em: string;
@@ -48,6 +55,7 @@ export type Vehicle = {
   km_ultima_revisao: number;
   data_ultima_troca_oleo: string | null;
   data_ultima_revisao: string | null;
+  cnh_exigida: CnhExigida | null;
   created_by: string | null;
   created_at: string;
   atualizado_por: string | null;

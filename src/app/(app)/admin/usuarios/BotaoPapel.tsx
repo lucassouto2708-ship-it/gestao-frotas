@@ -4,7 +4,45 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck, ShieldMinus, UserCheck, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { Role } from "@/lib/types";
+import { CATEGORIAS_CNH } from "@/lib/regras";
+import type { CategoriaCnh, Role } from "@/lib/types";
+
+/** Categoria da CNH da pessoa: o gestor escolhe e salva na hora (a regra é conferida no banco). */
+export function SeletorCnh({ id, cnh, nome }: { id: string; cnh: CategoriaCnh | null; nome: string }) {
+  const router = useRouter();
+  const [valor, setValor] = useState(cnh ?? "");
+  const [salvando, setSalvando] = useState(false);
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select
+        className={`campo h-8 w-28 text-xs ${valor ? "" : "text-alerta"}`}
+        aria-label={`CNH de ${nome}`}
+        value={valor}
+        disabled={salvando}
+        onChange={async (e) => {
+          const novo = e.target.value;
+          const anterior = valor;
+          setValor(novo);
+          setSalvando(true);
+          const { error } = await createClient().rpc("definir_cnh", { p_usuario: id, p_categoria: novo || null });
+          setSalvando(false);
+          if (error) {
+            setValor(anterior);
+            alert(error.message);
+          }
+          router.refresh();
+        }}
+      >
+        <option value="">Não informada</option>
+        {CATEGORIAS_CNH.map((c) => (
+          <option key={c} value={c}>CNH {c}</option>
+        ))}
+      </select>
+      {salvando && <Loader2 size={13} className="animate-spin text-texto-2" />}
+    </span>
+  );
+}
 
 /** Promove motorista a gestor ou volta gestor a motorista (a regra é conferida no banco). */
 export function BotaoPapel({ id, role }: { id: string; role: Role }) {
